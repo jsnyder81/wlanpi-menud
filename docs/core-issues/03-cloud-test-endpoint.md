@@ -1,4 +1,4 @@
-> **DRAFT — not filed.** File via GitHub when Phase 0 exits. Target repo: `WLAN-Pi/wlanpi-core`.
+> **FILED** as [WLAN-Pi/wlanpi-core#481](https://github.com/WLAN-Pi/wlanpi-core/issues/481) — "[FEATURE]: Vendor Reachability endpoint (MENUD)", Nov 8 2026. Open design point raised there: GET (this draft, per gap-matrix row 72 and the `/utils/speedtest` precedent) vs POST (kicking off a test is an action). Target repo: `WLAN-Pi/wlanpi-core`.
 
 # Title
 

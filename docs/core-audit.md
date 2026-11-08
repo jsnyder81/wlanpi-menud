@@ -115,6 +115,7 @@ All of these exist on `main`. They come from rebinding PoC stubs and service cal
 
 ## Follow-ups
 
+- Filed: [WLAN-Pi/wlanpi-core#481](https://github.com/WLAN-Pi/wlanpi-core/issues/481) — vendor cloud-test endpoint (drafts/03). Remaining drafts (01, 02, 04, 05) to be filed as narrow issues per the #130 closing guidance.
 - Generate the core client from `docs/openapi.json` (pinned to the audited commit) instead of carrying over `core_client/client.py`.
 - Add contract tests in CI against a pinned core version, starting with the 37 rows above plus the "needs" table.
 - Re-run this audit whenever the pinned core version moves.
