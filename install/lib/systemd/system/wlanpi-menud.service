@@ -1,0 +1,28 @@
+[Unit]
+Description=WLAN Pi menu service (wlanpi-menud)
+Documentation=https://github.com/WLAN-Pi/wlanpi-menud
+After=network.target wlanpi-core.service
+Wants=wlanpi-core.service
+
+[Service]
+Type=simple
+User=wlanpi
+Group=wlanpi-menud
+# local.sock and proxy.sock live here; systemd creates and removes it.
+RuntimeDirectory=wlanpi-menud
+RuntimeDirectoryMode=0750
+ExecStart=/opt/wlanpi-menud/bin/wlanpi-menud --config /etc/wlanpi-menud/config.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+# Hardening. sudo for the token helper needs setuid, so NoNewPrivileges stays off.
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=96M
+
+[Install]
+WantedBy=multi-user.target

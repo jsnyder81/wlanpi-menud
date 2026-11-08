@@ -1,0 +1,31 @@
+# wlanpi-menud configuration. Every key is optional; these are the defaults.
+
+# builtin_dir = "/usr/share/wlanpi-menud/menu.d"
+# plugins_dir = "/usr/share/wlanpi-menud/plugins.d"
+# override_dir = "/etc/wlanpi-menud/menu.d"
+
+# local_sock = "/run/wlanpi-menud/local.sock"
+# proxy_sock = "/run/wlanpi-menud/proxy.sock"
+# local_sock_group = "wlanpi-menud"
+# proxy_sock_group = "www-data"      # nginx's group
+
+# local.sock SO_PEERCRED allowlist. Names are resolved at start-up.
+# [local_uids]                       # uid -> roles
+# 0 = ["admin"]                      # root: the front panel
+# [local_user_names]
+# wlanpi = ["admin"]
+# [local_group_names]
+# wlanpi-menud = ["operator"]        # SSH users who run the TUI
+# provider_uids = []
+
+# allowed_origins = []               # empty: Origin must match the Host header
+# webui_roles = ["admin"]
+# jwt_roles = ["admin"]
+
+# core_base_url = "https://127.0.0.1:31415"
+# core_cert = "/etc/nginx/ssl/self-signed-wlanpi.cert"
+# token_command = ["sudo", "-n", "/usr/libexec/wlanpi-menud/get-core-token"]
+
+# poll_interval_sec = 5.0
+# queue_frames = 64
+# page_size = 20

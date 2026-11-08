@@ -1,0 +1,302 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "apps",
+      "label": "Apps",
+      "parent": null,
+      "order": 40,
+      "visibility": {
+        "modes": [
+          "classic"
+        ]
+      }
+    },
+    {
+      "id": "apps.kismet",
+      "label": "Kismet",
+      "parent": "apps",
+      "order": 10
+    },
+    {
+      "id": "apps.kismet.start",
+      "label": "Start",
+      "parent": "apps.kismet",
+      "order": 10,
+      "action": {
+        "core": "POST /system/service/start",
+        "view": "status",
+        "query": {
+          "name": "kismet"
+        }
+      }
+    },
+    {
+      "id": "apps.kismet.stop",
+      "label": "Stop",
+      "parent": "apps.kismet",
+      "order": 20,
+      "action": {
+        "core": "POST /system/service/stop",
+        "view": "status",
+        "query": {
+          "name": "kismet"
+        }
+      }
+    },
+    {
+      "id": "apps.profiler",
+      "label": "Profiler",
+      "parent": "apps",
+      "order": 20
+    },
+    {
+      "id": "apps.profiler.status",
+      "label": "Status",
+      "parent": "apps.profiler",
+      "order": 10,
+      "action": {
+        "handler": "apps.profiler.status",
+        "view": "qr"
+      }
+    },
+    {
+      "id": "apps.profiler.stop",
+      "label": "Stop",
+      "parent": "apps.profiler",
+      "order": 20,
+      "action": {
+        "core": "POST /profiler/stop",
+        "view": "status"
+      }
+    },
+    {
+      "id": "apps.profiler.start",
+      "label": "Start",
+      "parent": "apps.profiler",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {}
+      }
+    },
+    {
+      "id": "apps.profiler.start_other",
+      "label": "Start Other",
+      "parent": "apps.profiler",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      }
+    },
+    {
+      "id": "apps.profiler.start_2_4",
+      "label": "Start 2.4 GHz",
+      "parent": "apps.profiler.start_other",
+      "order": 10,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 6
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_5_36",
+      "label": "Start 5 GHz 36",
+      "parent": "apps.profiler.start_other",
+      "order": 20,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 36
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_5_149",
+      "label": "Start 5 GHz 149",
+      "parent": "apps.profiler.start_other",
+      "order": 30,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 149
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_no11r",
+      "label": "Start (no 11r)",
+      "parent": "apps.profiler.start_other",
+      "order": 40,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "no11r": true
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_no11ax",
+      "label": "Start (no 11ax)",
+      "parent": "apps.profiler.start_other",
+      "order": 50,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "no11ax": true
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.purge",
+      "label": "Purge Data",
+      "parent": "apps.profiler",
+      "order": 50,
+      "visibility": {
+        "min_role": "admin"
+      },
+      "action": {
+        "core": "POST /profiler/purge",
+        "view": "status",
+        "confirm": {
+          "title": "Purge",
+          "message": "Delete all profiler client profiles, captures and reports? This cannot be undone."
+        }
+      }
+    },
+    {
+      "id": "apps.scanner",
+      "label": "Scanner",
+      "parent": "apps",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "monitor_adapter"
+        ]
+      }
+    },
+    {
+      "id": "apps.scanner.scan",
+      "label": "Scan",
+      "parent": "apps.scanner",
+      "order": 10,
+      "params": [
+        {
+          "name": "adapter",
+          "label": "Adapter",
+          "type": "adapter",
+          "kind": "wlan",
+          "monitor": true,
+          "required": false
+        }
+      ],
+      "action": {
+        "core": "GET /utils/wlan/scan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30,
+        "timeout_sec": 60,
+        "query": {
+          "hidden": true
+        },
+        "bind": {
+          "adapter": "query"
+        }
+      }
+    },
+    {
+      "id": "apps.scanner.scan_nohidden",
+      "label": "Scan (no hidden)",
+      "parent": "apps.scanner",
+      "order": 20,
+      "params": [
+        {
+          "name": "adapter",
+          "label": "Adapter",
+          "type": "adapter",
+          "kind": "wlan",
+          "monitor": true,
+          "required": false
+        }
+      ],
+      "action": {
+        "core": "GET /utils/wlan/scan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30,
+        "timeout_sec": 60,
+        "query": {
+          "hidden": false
+        },
+        "bind": {
+          "adapter": "query"
+        }
+      }
+    },
+    {
+      "id": "apps.scanner.csv",
+      "label": "Scan to CSV",
+      "parent": "apps.scanner",
+      "order": 30,
+      "visibility": {
+        "requires_core": "POST /scanner/scan/csv"
+      },
+      "action": {
+        "handler": "apps.scanner.csv",
+        "view": "status",
+        "mutates": true
+      }
+    },
+    {
+      "id": "apps.scanner.pcap",
+      "label": "Scan to PCAP",
+      "parent": "apps.scanner",
+      "order": 40,
+      "visibility": {
+        "requires_core": [
+          "POST /scanner/capture/start",
+          "POST /scanner/capture/stop"
+        ]
+      }
+    },
+    {
+      "id": "apps.scanner.pcap_start",
+      "label": "Start",
+      "parent": "apps.scanner.pcap",
+      "order": 10,
+      "action": {
+        "handler": "apps.scanner.pcap_start",
+        "view": "status",
+        "cancellable": true,
+        "mutates": true
+      }
+    },
+    {
+      "id": "apps.scanner.pcap_stop",
+      "label": "Stop",
+      "parent": "apps.scanner.pcap",
+      "order": 20,
+      "action": {
+        "handler": "apps.scanner.pcap_stop",
+        "view": "status",
+        "mutates": true
+      }
+    }
+  ]
+}

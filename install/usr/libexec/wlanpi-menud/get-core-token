@@ -1,0 +1,18 @@
+#!/bin/sh
+# Print a wlanpi-core JWT for the reserved device id "wlanpi-menud".
+#
+# Runs as root via sudo (see /etc/sudoers.d/wlanpi-menud); only the wlanpi
+# user may run it. getjwt signs the request with core's root-only HMAC
+# secret, which is why this needs root. The service reads the JSON from
+# stdout and keeps the token in memory only; nothing is written to disk.
+#
+# Takes no arguments, so a caller cannot mint a token for any other id.
+set -eu
+umask 077
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+if [ "$#" -ne 0 ]; then
+    echo "usage: get-core-token" >&2
+    exit 2
+fi
+exec /usr/bin/getjwt wlanpi-menud --no-color

@@ -1,0 +1,124 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "network",
+      "label": "Network",
+      "parent": null,
+      "order": 10
+    },
+    {
+      "id": "network.interfaces",
+      "label": "Interfaces",
+      "parent": "network",
+      "order": 10,
+      "action": {
+        "handler": "network.interfaces",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 10
+      }
+    },
+    {
+      "id": "network.wlan_interfaces",
+      "label": "WLAN Interfaces",
+      "parent": "network",
+      "order": 20,
+      "action": {
+        "handler": "network.wlan_interfaces",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 10
+      }
+    },
+    {
+      "id": "network.adapter_summary",
+      "label": "Adapters",
+      "parent": "network",
+      "order": 25,
+      "action": {
+        "handler": "network.adapter_summary",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 10
+      }
+    },
+    {
+      "id": "network.eth0_ipconfig",
+      "label": "Eth0 IP Config",
+      "parent": "network",
+      "order": 30,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 10,
+        "select": "/eth0_ipconfig_info"
+      }
+    },
+    {
+      "id": "network.eth0_vlan",
+      "label": "Eth0 VLAN",
+      "parent": "network",
+      "order": 40,
+      "action": {
+        "core": "GET /network/ethernet/eth0/vlan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 10
+      }
+    },
+    {
+      "id": "network.lldp",
+      "label": "LLDP Neighbour",
+      "parent": "network",
+      "order": 50,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30,
+        "select": "/lldp_neighbour_info"
+      }
+    },
+    {
+      "id": "network.cdp",
+      "label": "CDP Neighbour",
+      "parent": "network",
+      "order": 60,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30,
+        "select": "/cdp_neighbour_info"
+      }
+    },
+    {
+      "id": "network.publicip4",
+      "label": "Public IPv4",
+      "parent": "network",
+      "order": 70,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 60,
+        "select": "/public_ip"
+      }
+    },
+    {
+      "id": "network.publicip6",
+      "label": "Public IPv6",
+      "parent": "network",
+      "order": 80,
+      "action": {
+        "core": "GET /network/info/publicip6",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 60
+      }
+    }
+  ]
+}

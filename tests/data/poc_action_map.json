@@ -1,0 +1,277 @@
+{
+ "source": "wlanpi-fpms2 0.1.2 wlanpi_fpms2/actions/registry.py (68 action ids; menu_tree.py has 61 action_id= sites, RF domains and timezones are loop-built)",
+ "map": {
+  "network.interfaces": {
+   "node": "network.interfaces",
+   "note": "same id"
+  },
+  "network.wlan_interfaces": {
+   "node": "network.wlan_interfaces",
+   "note": "same id"
+  },
+  "network.eth0_ipconfig": {
+   "node": "network.eth0_ipconfig",
+   "note": "same id"
+  },
+  "network.eth0_vlan": {
+   "node": "network.eth0_vlan",
+   "note": "same id"
+  },
+  "network.lldp": {
+   "node": "network.lldp",
+   "note": "same id"
+  },
+  "network.cdp": {
+   "node": "network.cdp",
+   "note": "same id"
+  },
+  "network.publicip4": {
+   "node": "network.publicip4",
+   "note": "same id"
+  },
+  "network.publicip6": {
+   "node": "network.publicip6",
+   "note": "same id"
+  },
+  "bluetooth.status": {
+   "node": "bluetooth.status",
+   "note": "same id"
+  },
+  "bluetooth.on": {
+   "node": "bluetooth.on",
+   "note": "same id"
+  },
+  "bluetooth.off": {
+   "node": "bluetooth.off",
+   "note": "same id"
+  },
+  "bluetooth.pair": {
+   "node": "bluetooth.pair",
+   "note": "same id"
+  },
+  "utils.reachability": {
+   "node": "utils.reachability",
+   "note": "same id"
+  },
+  "utils.speedtest": {
+   "node": "utils.speedtest.run",
+   "note": "renamed: the PoC action id was the branch id"
+  },
+  "utils.cloud.arista": {
+   "node": "utils.cloud.arista",
+   "note": "same id"
+  },
+  "utils.cloud.aruba": {
+   "node": "utils.cloud.aruba",
+   "note": "same id"
+  },
+  "utils.cloud.extreme": {
+   "node": "utils.cloud.extreme",
+   "note": "same id"
+  },
+  "utils.cloud.meraki": {
+   "node": "utils.cloud.meraki",
+   "note": "same id"
+  },
+  "utils.cloud.mist": {
+   "node": "utils.cloud.mist",
+   "note": "same id"
+  },
+  "utils.cloud.ruckus": {
+   "node": "utils.cloud.ruckus",
+   "note": "same id"
+  },
+  "utils.port_blinker.start": {
+   "node": "utils.port_blinker.start",
+   "note": "same id"
+  },
+  "utils.port_blinker.stop": {
+   "node": "utils.port_blinker.stop",
+   "note": "same id"
+  },
+  "utils.ssid_passphrase": {
+   "node": "utils.ssid_passphrase",
+   "note": "same id"
+  },
+  "utils.usb": {
+   "node": "utils.usb",
+   "note": "same id"
+  },
+  "utils.ufw": {
+   "node": "utils.ufw",
+   "note": "same id"
+  },
+  "modes.hotspot": {
+   "node": "modes.hotspot",
+   "note": "same id"
+  },
+  "modes.server": {
+   "node": "modes.server",
+   "note": "same id"
+  },
+  "modes.bridge": {
+   "node": "modes.bridge",
+   "note": "same id"
+  },
+  "modes.classic": {
+   "node": "modes.classic",
+   "note": "same id"
+  },
+  "apps.profiler.status": {
+   "node": "apps.profiler.status",
+   "note": "same id"
+  },
+  "apps.profiler.stop": {
+   "node": "apps.profiler.stop",
+   "note": "same id"
+  },
+  "apps.profiler.start": {
+   "node": "apps.profiler.start",
+   "note": "same id"
+  },
+  "apps.profiler.start_2_4": {
+   "node": "apps.profiler.start_2_4",
+   "note": "same id"
+  },
+  "apps.profiler.start_5_36": {
+   "node": "apps.profiler.start_5_36",
+   "note": "same id"
+  },
+  "apps.profiler.start_5_149": {
+   "node": "apps.profiler.start_5_149",
+   "note": "same id"
+  },
+  "apps.profiler.start_no11r": {
+   "node": "apps.profiler.start_no11r",
+   "note": "same id"
+  },
+  "apps.profiler.start_no11ax": {
+   "node": "apps.profiler.start_no11ax",
+   "note": "same id"
+  },
+  "apps.profiler.purge_reports": {
+   "node": "apps.profiler.purge",
+   "note": "merged: core has one POST /profiler/purge"
+  },
+  "apps.profiler.purge_files": {
+   "node": "apps.profiler.purge",
+   "note": "merged: core has one POST /profiler/purge"
+  },
+  "apps.kismet.start": {
+   "node": "apps.kismet.start",
+   "note": "same id"
+  },
+  "apps.kismet.stop": {
+   "node": "apps.kismet.stop",
+   "note": "same id"
+  },
+  "apps.scanner.scan": {
+   "node": "apps.scanner.scan",
+   "note": "same id"
+  },
+  "apps.scanner.scan_nohidden": {
+   "node": "apps.scanner.scan_nohidden",
+   "note": "same id"
+  },
+  "apps.scanner.csv": {
+   "node": "apps.scanner.csv",
+   "note": "same id"
+  },
+  "apps.scanner.pcap_start": {
+   "node": "apps.scanner.pcap_start",
+   "note": "same id"
+  },
+  "apps.scanner.pcap_stop": {
+   "node": "apps.scanner.pcap_stop",
+   "note": "same id"
+  },
+  "system.about": {
+   "node": "system.about",
+   "note": "same id"
+  },
+  "system.help": {
+   "node": "system.help",
+   "note": "same id"
+  },
+  "system.summary": {
+   "node": "system.summary",
+   "note": "same id"
+  },
+  "system.battery": {
+   "node": "system.battery",
+   "note": "same id"
+  },
+  "system.date": {
+   "node": "system.date",
+   "note": "same id"
+  },
+  "system.timezone.auto": {
+   "node": "system.timezone.auto",
+   "note": "same id"
+  },
+  "system.timezone.set": {
+   "node": "system.timezone.set",
+   "note": "same id"
+  },
+  "system.reg_domain.show": {
+   "node": "system.reg_domain.show",
+   "note": "same id"
+  },
+  "system.reg_domain.set_us": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=US is an enum parameter"
+  },
+  "system.reg_domain.set_br": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=BR is an enum parameter"
+  },
+  "system.reg_domain.set_ca": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=CA is an enum parameter"
+  },
+  "system.reg_domain.set_cz": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=CZ is an enum parameter"
+  },
+  "system.reg_domain.set_de": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=DE is an enum parameter"
+  },
+  "system.reg_domain.set_fr": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=FR is an enum parameter"
+  },
+  "system.reg_domain.set_gb": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=GB is an enum parameter"
+  },
+  "system.reg_domain.set_nl": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=NL is an enum parameter"
+  },
+  "system.reg_domain.set_no": {
+   "node": "system.reg_domain.set",
+   "note": "merged: country=NO is an enum parameter"
+  },
+  "system.rotate_display": {
+   "node": "system.rotate_display",
+   "note": "same id"
+  },
+  "system.updates.check": {
+   "node": null,
+   "note": "dropped per the plan: no core endpoint"
+  },
+  "system.updates.install": {
+   "node": null,
+   "note": "dropped per the plan: no core endpoint"
+  },
+  "system.reboot": {
+   "node": "system.reboot",
+   "note": "same id"
+  },
+  "system.shutdown": {
+   "node": "system.shutdown",
+   "note": "same id"
+  }
+ }
+}

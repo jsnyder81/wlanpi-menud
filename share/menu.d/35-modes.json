@@ -1,0 +1,120 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "modes",
+      "label": "Modes",
+      "parent": null,
+      "order": 35,
+      "visibility": {
+        "modes": [
+          "classic",
+          "hotspot",
+          "server",
+          "bridge"
+        ],
+        "requires_core": "POST /system/mode/switch"
+      }
+    },
+    {
+      "id": "modes.hotspot",
+      "label": "Hotspot",
+      "parent": "modes",
+      "order": 10,
+      "visibility": {
+        "modes": [
+          "classic"
+        ],
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "hotspot"
+        },
+        "confirm": {
+          "title": "Hotspot",
+          "message": "Switch to Hotspot mode? The WLAN Pi reboots."
+        }
+      }
+    },
+    {
+      "id": "modes.server",
+      "label": "Server",
+      "parent": "modes",
+      "order": 12,
+      "visibility": {
+        "modes": [
+          "classic"
+        ],
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "server"
+        },
+        "confirm": {
+          "title": "Server",
+          "message": "Switch to Server mode? The WLAN Pi reboots."
+        }
+      }
+    },
+    {
+      "id": "modes.bridge",
+      "label": "Bridge",
+      "parent": "modes",
+      "order": 14,
+      "visibility": {
+        "modes": [
+          "classic"
+        ],
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "bridge"
+        },
+        "confirm": {
+          "title": "Bridge",
+          "message": "Switch to Bridge mode? The WLAN Pi reboots."
+        }
+      }
+    },
+    {
+      "id": "modes.classic",
+      "label": "Classic Mode",
+      "parent": "modes",
+      "order": 20,
+      "visibility": {
+        "modes": [
+          "hotspot",
+          "server",
+          "bridge"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "classic"
+        },
+        "confirm": {
+          "title": "Classic",
+          "message": "Switch to Classic mode? The WLAN Pi reboots."
+        }
+      }
+    }
+  ]
+}

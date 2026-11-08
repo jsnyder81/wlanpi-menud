@@ -1,0 +1,5 @@
+Local menu overrides. Each *.json file here is validated against
+/usr/share/wlanpi-menud/protocol/menu.schema.json. A file may add nodes or
+replace a built-in node by reusing its id; plugin.* ids are refused. A bad
+file is rejected (the error names the file and field) and everything else
+still loads. Apply changes with: systemctl reload wlanpi-menud

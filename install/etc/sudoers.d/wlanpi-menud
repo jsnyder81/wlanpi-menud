@@ -1,0 +1,6 @@
+# wlanpi-menud fetches its own wlanpi-core token (did=wlanpi-menud) through a
+# root helper, the same pattern as wlanpi-webui's get-core-token. Only the
+# wlanpi user may run it, only without arguments, and without a password.
+# Install mode 0440, owner root:root. Validate with: visudo -cf <file>
+Defaults!/usr/libexec/wlanpi-menud/get-core-token !requiretty
+wlanpi ALL=(root) NOPASSWD: /usr/libexec/wlanpi-menud/get-core-token ""

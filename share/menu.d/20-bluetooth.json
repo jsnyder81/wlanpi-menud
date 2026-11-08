@@ -1,0 +1,69 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "bluetooth",
+      "label": "Bluetooth",
+      "parent": null,
+      "order": 20,
+      "visibility": {
+        "capabilities": [
+          "bluetooth"
+        ]
+      }
+    },
+    {
+      "id": "bluetooth.status",
+      "label": "Status",
+      "parent": "bluetooth",
+      "order": 10,
+      "action": {
+        "core": "GET /bluetooth/status",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "bluetooth.on",
+      "label": "Turn On",
+      "parent": "bluetooth",
+      "order": 20,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /bluetooth/power/on",
+        "view": "status"
+      }
+    },
+    {
+      "id": "bluetooth.off",
+      "label": "Turn Off",
+      "parent": "bluetooth",
+      "order": 30,
+      "action": {
+        "core": "POST /bluetooth/power/off",
+        "view": "status"
+      }
+    },
+    {
+      "id": "bluetooth.pair",
+      "label": "Pair Device",
+      "parent": "bluetooth",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /bluetooth/pair",
+        "view": "status"
+      }
+    }
+  ]
+}

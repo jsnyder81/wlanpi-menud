@@ -1,0 +1,250 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "system",
+      "label": "System",
+      "parent": null,
+      "order": 50
+    },
+    {
+      "id": "system.about",
+      "label": "About",
+      "parent": "system",
+      "order": 10,
+      "action": {
+        "core": "GET /system/device/info",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 300
+      }
+    },
+    {
+      "id": "system.help",
+      "label": "Help",
+      "parent": "system",
+      "order": 20,
+      "action": {
+        "handler": "system.help",
+        "view": "qr",
+        "shareable": true,
+        "fresh_sec": 3600
+      }
+    },
+    {
+      "id": "system.summary",
+      "label": "Summary",
+      "parent": "system",
+      "order": 30,
+      "action": {
+        "core": "GET /system/device/stats",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "system.battery",
+      "label": "Battery",
+      "parent": "system",
+      "order": 40,
+      "action": {
+        "core": "GET /system/battery",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    },
+    {
+      "id": "system.settings",
+      "label": "Settings",
+      "parent": "system",
+      "order": 50
+    },
+    {
+      "id": "system.settings.datetime",
+      "label": "Date & Time",
+      "parent": "system.settings",
+      "order": 10
+    },
+    {
+      "id": "system.date",
+      "label": "Show Time & Zone",
+      "parent": "system.settings.datetime",
+      "order": 10,
+      "action": {
+        "core": "GET /system/datetime",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 1
+      }
+    },
+    {
+      "id": "system.timezone",
+      "label": "Set Timezone",
+      "parent": "system.settings.datetime",
+      "order": 20,
+      "visibility": {
+        "min_role": "operator"
+      }
+    },
+    {
+      "id": "system.timezone.auto",
+      "label": "Auto",
+      "parent": "system.timezone",
+      "order": 10,
+      "action": {
+        "core": "POST /system/timezone/auto",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system.timezone.set",
+      "label": "Manual",
+      "parent": "system.timezone",
+      "order": 20,
+      "action": {
+        "handler": "system.timezone.pick",
+        "view": "status",
+        "mutates": true
+      }
+    },
+    {
+      "id": "system.settings.rf_domain",
+      "label": "RF Domain",
+      "parent": "system.settings",
+      "order": 20
+    },
+    {
+      "id": "system.reg_domain.show",
+      "label": "Show Domain",
+      "parent": "system.settings.rf_domain",
+      "order": 10,
+      "action": {
+        "core": "GET /system/reg-domain",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    },
+    {
+      "id": "system.reg_domain.set",
+      "label": "Set Domain",
+      "parent": "system.settings.rf_domain",
+      "order": 20,
+      "visibility": {
+        "min_role": "admin"
+      },
+      "params": [
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "enum",
+          "choices": [
+            {
+              "value": "US",
+              "label": "US"
+            },
+            {
+              "value": "AU",
+              "label": "AU"
+            },
+            {
+              "value": "BR",
+              "label": "BR"
+            },
+            {
+              "value": "CA",
+              "label": "CA"
+            },
+            {
+              "value": "CZ",
+              "label": "CZ"
+            },
+            {
+              "value": "DE",
+              "label": "DE"
+            },
+            {
+              "value": "FR",
+              "label": "FR"
+            },
+            {
+              "value": "GB",
+              "label": "GB"
+            },
+            {
+              "value": "NL",
+              "label": "NL"
+            },
+            {
+              "value": "NO",
+              "label": "NO"
+            }
+          ]
+        }
+      ],
+      "action": {
+        "core": "POST /system/reg-domain/set",
+        "view": "status",
+        "bind": {
+          "country": "body"
+        },
+        "confirm": {
+          "title": "RF Domain",
+          "message": "Change the regulatory domain? A reboot is needed to apply it."
+        }
+      }
+    },
+    {
+      "id": "system.rotate_display",
+      "label": "Rotate Display",
+      "parent": "system.settings",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "display"
+        ]
+      },
+      "action": {
+        "handler": "system.rotate_display",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system.reboot",
+      "label": "Reboot",
+      "parent": "system",
+      "order": 60,
+      "visibility": {
+        "min_role": "operator"
+      },
+      "action": {
+        "core": "POST /system/reboot",
+        "view": "status",
+        "confirm": {
+          "title": "Reboot",
+          "message": "Reboot the WLAN Pi now?"
+        }
+      }
+    },
+    {
+      "id": "system.shutdown",
+      "label": "Shutdown",
+      "parent": "system",
+      "order": 70,
+      "visibility": {
+        "min_role": "operator"
+      },
+      "action": {
+        "core": "POST /system/shutdown",
+        "view": "status",
+        "confirm": {
+          "title": "Shutdown",
+          "message": "Shut down the WLAN Pi now?"
+        }
+      }
+    }
+  ]
+}

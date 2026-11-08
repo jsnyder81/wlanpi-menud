@@ -1,0 +1,206 @@
+{
+  "$schema": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "utils",
+      "label": "Utils",
+      "parent": null,
+      "order": 30
+    },
+    {
+      "id": "utils.reachability",
+      "label": "Reachability",
+      "parent": "utils",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/reachability",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 15,
+        "timeout_sec": 60
+      }
+    },
+    {
+      "id": "utils.speedtest",
+      "label": "Speedtest",
+      "parent": "utils",
+      "order": 20
+    },
+    {
+      "id": "utils.speedtest.run",
+      "label": "Run Test",
+      "parent": "utils.speedtest",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/speedtest",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 10,
+        "timeout_sec": 120,
+        "cancellable": true
+      }
+    },
+    {
+      "id": "utils.cloud",
+      "label": "Cloud Tests",
+      "parent": "utils",
+      "order": 30,
+      "visibility": {
+        "requires_core": "GET /utils/cloud-test/{vendor}"
+      }
+    },
+    {
+      "id": "utils.cloud.arista",
+      "label": "Arista CV-CUE",
+      "parent": "utils.cloud",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/cloud-test/arista",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.aruba",
+      "label": "Aruba Central",
+      "parent": "utils.cloud",
+      "order": 20,
+      "action": {
+        "core": "GET /utils/cloud-test/aruba",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.extreme",
+      "label": "ExtremeCloud IQ",
+      "parent": "utils.cloud",
+      "order": 30,
+      "action": {
+        "core": "GET /utils/cloud-test/extreme",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.meraki",
+      "label": "Meraki Cloud",
+      "parent": "utils.cloud",
+      "order": 40,
+      "action": {
+        "core": "GET /utils/cloud-test/meraki",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.mist",
+      "label": "Mist Cloud",
+      "parent": "utils.cloud",
+      "order": 50,
+      "action": {
+        "core": "GET /utils/cloud-test/mist",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.ruckus",
+      "label": "RUCKUS Cloud",
+      "parent": "utils.cloud",
+      "order": 60,
+      "action": {
+        "core": "GET /utils/cloud-test/ruckus",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.port_blinker",
+      "label": "Port Blinker",
+      "parent": "utils",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "ethernet"
+        ]
+      }
+    },
+    {
+      "id": "utils.port_blinker.start",
+      "label": "Start",
+      "parent": "utils.port_blinker",
+      "order": 10,
+      "action": {
+        "core": "POST /utils/blinker/start",
+        "view": "status",
+        "query": {
+          "interface": "eth0"
+        }
+      }
+    },
+    {
+      "id": "utils.port_blinker.stop",
+      "label": "Stop",
+      "parent": "utils.port_blinker",
+      "order": 20,
+      "action": {
+        "core": "POST /utils/blinker/stop",
+        "view": "status"
+      }
+    },
+    {
+      "id": "utils.ssid_passphrase",
+      "label": "SSID/Passphrase",
+      "parent": "utils",
+      "order": 50,
+      "visibility": {
+        "not_modes": [
+          "classic"
+        ],
+        "min_role": "operator"
+      },
+      "action": {
+        "handler": "utils.ssid_passphrase",
+        "view": "qr"
+      }
+    },
+    {
+      "id": "utils.usb",
+      "label": "USB Devices",
+      "parent": "utils",
+      "order": 60,
+      "action": {
+        "core": "GET /utils/usb",
+        "view": "list",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "utils.ufw",
+      "label": "UFW Ports",
+      "parent": "utils",
+      "order": 70,
+      "action": {
+        "core": "GET /utils/ufw",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    }
+  ]
+}
