@@ -1,0 +1,22 @@
+# WLAN Pi FHS policy: the application and its venv live in /opt/wlanpi-menud.
+wlanpi-menud: dir-or-file-in-opt [opt/wlanpi-menud/*]
+# Documented in README.md and --help; WLAN Pi services ship no man pages.
+wlanpi-menud: no-manual-page [usr/bin/wlanpi-menud]
+# The private virtualenv under /opt/wlanpi-menud (dh-virtualenv) carries
+# upstream wheels as-is. Everything below is a property of that tree.
+#
+# Byte-code ships on purpose: /opt is read-only to the service
+# (ProtectSystem=strict), so Python cannot write it at run time.
+wlanpi-menud: package-installs-python-pycache-dir [opt/wlanpi-menud/*]
+# Entry points use the venv's own interpreter.
+wlanpi-menud: unusual-interpreter * [opt/wlanpi-menud/*]
+wlanpi-menud: executable-not-elf-or-script [opt/wlanpi-menud/*]
+wlanpi-menud: script-not-executable [opt/wlanpi-menud/*]
+wlanpi-menud: extra-license-file [opt/wlanpi-menud/*]
+wlanpi-menud: package-contains-documentation-outside-usr-share-doc [opt/wlanpi-menud/*]
+wlanpi-menud: hardening-no-bindnow [opt/wlanpi-menud/*]
+wlanpi-menud: hardening-no-fortify-functions [opt/wlanpi-menud/*]
+# The protocol contract is read by surfaces and plugin authors, next to the schemas.
+wlanpi-menud: package-contains-documentation-outside-usr-share-doc [usr/share/wlanpi-menud/protocol/PROTOCOL.md]
+# Plugin packages drop their manifests into plugins.d/<name>/.
+wlanpi-menud: package-contains-empty-directory [usr/share/wlanpi-menud/plugins.d/]

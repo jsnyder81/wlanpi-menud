@@ -32,3 +32,32 @@ def test_config_defaults_match_install_layout():
     assert c.proxy_sock_mode == 0o660 and c.core_base_url == "https://127.0.0.1:31415"
     unit = (INSTALL / "lib/systemd/system/wlanpi-menud.service").read_text()
     assert "User=wlanpi" in unit and "RuntimeDirectory=wlanpi-menud" in unit
+
+
+def test_protocol_dir_env_override_and_shared_fallback(tmp_path, monkeypatch):
+    from wlanpi_menud import manifest
+
+    (tmp_path / "menu.schema.json").write_text("{}")
+    monkeypatch.setenv("WLANPI_MENUD_PROTOCOL_DIR", str(tmp_path))
+    assert manifest._find_protocol_dir() == tmp_path
+    monkeypatch.delenv("WLANPI_MENUD_PROTOCOL_DIR")
+    assert (manifest._find_protocol_dir() / "menu.schema.json").is_file()  # the checkout copy
+    assert str(manifest.SHARED_PROTOCOL_DIR) == "/usr/share/wlanpi-menud/protocol"
+
+
+def test_debian_package_installs_what_the_defaults_point_at():
+    root = INSTALL.parent
+    dest = {}
+    for line in (root / "debian/wlanpi-menud.install").read_text().splitlines():
+        src, target = line.split()
+        dest[src] = target
+    assert dest["install/usr/libexec/wlanpi-menud/get-core-token"] == "usr/libexec/wlanpi-menud/"
+    assert dest["install/etc/sudoers.d/wlanpi-menud"] == "etc/sudoers.d/"
+    assert dest["protocol/menu.schema.json"] == "usr/share/wlanpi-menud/protocol/"
+    assert dest["share/menu.d/*.json"] == "usr/share/wlanpi-menud/menu.d/"
+    rules = (root / "debian/rules").read_text()
+    assert "chmod 0440 debian/$(PACKAGE)/etc/sudoers.d/wlanpi-menud" in rules
+    assert '--install-suffix "wlanpi-menud"' in rules and "DH_VIRTUALENV_INSTALL_ROOT=/opt" in rules
+    unit = (INSTALL / "lib/systemd/system/wlanpi-menud.service").read_text()
+    assert "NoNewPrivileges=yes" not in unit  # sudo (setuid) must keep working
+    assert "SupplementaryGroups=www-data" in unit and "RuntimeDirectoryMode=0755" in unit

@@ -1,0 +1,14 @@
+#!/bin/sh
+# wlanpi-menud postrm
+set -e
+
+if [ "$1" = "purge" ]; then
+    # Local overrides an admin dropped next to the shipped conffiles.
+    rm -rf /etc/wlanpi-menud/menu.d
+    rmdir /etc/wlanpi-menud 2>/dev/null || true
+    rm -rf /run/wlanpi-menud
+fi
+
+#DEBHELPER#
+
+exit 0

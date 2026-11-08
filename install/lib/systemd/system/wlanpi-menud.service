@@ -8,20 +8,49 @@ Wants=wlanpi-core.service
 Type=simple
 User=wlanpi
 Group=wlanpi-menud
+# proxy.sock is chgrp'd to nginx's group (www-data), which needs membership.
+SupplementaryGroups=www-data
 # local.sock and proxy.sock live here; systemd creates and removes it.
+# 0755 so nginx can reach proxy.sock: each socket's 0660 mode and group
+# decide who may connect.
 RuntimeDirectory=wlanpi-menud
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=0755
+UMask=0007
 ExecStart=/opt/wlanpi-menud/bin/wlanpi-menud --config /etc/wlanpi-menud/config.toml
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=2
-# Hardening. sudo for the token helper needs setuid, so NoNewPrivileges stays off.
+
+# Hardening. The token helper runs through sudo, which needs setuid, so
+# NoNewPrivileges= and CapabilityBoundingSet= stay unset. Everything below
+# was checked on trixie (systemd 257) to leave NoNewPrivs at 0 and the
+# helper working: systemd installs the seccomp filters before it drops to
+# User=, so they do not imply NoNewPrivileges.
 ProtectSystem=strict
 ProtectHome=read-only
 PrivateTmp=yes
+# No hardware: only /dev/null, zero, full, random, urandom, tty, pts.
+PrivateDevices=yes
 ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
 ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+# Unix sockets only, plus loopback HTTPS to wlanpi-core. No listener on IP.
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+# sudo keeps its timestamp records here.
+ReadWritePaths=-/run/sudo
 MemoryMax=96M
 
 [Install]

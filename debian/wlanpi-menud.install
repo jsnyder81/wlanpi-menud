@@ -1,0 +1,9 @@
+install/etc/wlanpi-menud/config.toml etc/wlanpi-menud/
+install/etc/wlanpi-menud/menu.d/README etc/wlanpi-menud/menu.d/
+install/etc/sudoers.d/wlanpi-menud etc/sudoers.d/
+install/usr/libexec/wlanpi-menud/get-core-token usr/libexec/wlanpi-menud/
+install/lib/systemd/system/wlanpi-menud.service usr/lib/systemd/system/
+share/menu.d/*.json usr/share/wlanpi-menud/menu.d/
+protocol/menu.schema.json usr/share/wlanpi-menud/protocol/
+protocol/frames.schema.json usr/share/wlanpi-menud/protocol/
+protocol/PROTOCOL.md usr/share/wlanpi-menud/protocol/

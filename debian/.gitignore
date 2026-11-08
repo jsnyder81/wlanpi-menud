@@ -1,0 +1,7 @@
+wlanpi-menud.*.debhelper
+wlanpi-menud.substvars
+wlanpi-menud/
+.debhelper/
+files
+debhelper-build-stamp
+*.log

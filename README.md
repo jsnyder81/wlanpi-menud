@@ -19,7 +19,8 @@ to wlanpi-core. See `FPMS Re-Architecture Plan.md` for the design and
 | `wlanpi_menud/core/` | Core client: `generated.py` (from core's `docs/openapi.json`), HTTPS transport with a pinned cert, service token |
 | `wlanpi_menud/server.py`, `service.py`, `session.py`, `outqueue.py`, `topics.py`, `views.py` | Sockets, auth, sessions, bounded queues, topics, thin views |
 | `wlanpi_menud/poller.py` | The one polling loop (publishes only on change) |
-| `install/` | Root token helper, sudoers entry, systemd unit, example config |
+| `install/` | Root token helper, sudoers entry, systemd unit, example config (installed by `debian/`) |
+| `debian/`, `build-package-native.sh`, `Dockerfile.build` | Debian packaging (dh-virtualenv) and the container build |
 | `tests/` | pytest suite with a fake core (`tests/fakecore.py`, respx) |
 | `demo/` | Two concurrent thin clients navigating independently, with captured output |
 | `tools/gen_core_client.py` | Regenerates `wlanpi_menud/core/generated.py` from a wlanpi-core checkout |
@@ -41,6 +42,51 @@ to wlanpi-core. See `FPMS Re-Architecture Plan.md` for the design and
   `AUTH_CLOCK_NOT_SET`.
 - `systemctl reload wlanpi-menud` (SIGHUP) reloads manifests;
   `wlanpi-menud --check` validates them and exits.
+
+## Installation
+
+`wlanpi-menud` ships as a Debian package built with dh-virtualenv:
+
+```sh
+sudo apt install ./wlanpi-menud_<version>_arm64.deb
+systemctl status wlanpi-menud
+```
+
+| Path | What |
+| --- | --- |
+| `/opt/wlanpi-menud/` | Private Python 3.13 virtualenv |
+| `/usr/bin/wlanpi-menud` | Link to the venv entry point (`--check` validates manifests) |
+| `/etc/wlanpi-menud/config.toml` | Config (conffile; every key optional) |
+| `/etc/wlanpi-menud/menu.d/` | Local manifest overrides |
+| `/usr/share/wlanpi-menud/menu.d/`, `plugins.d/`, `protocol/` | Built-in manifests, plugin manifests, schemas |
+| `/usr/lib/systemd/system/wlanpi-menud.service` | Runs as `wlanpi`, group `wlanpi-menud`, sandboxed |
+| `/run/wlanpi-menud/` | `local.sock` (0660, group `wlanpi-menud`) and `proxy.sock` (0660, group `www-data`) |
+| `/usr/libexec/wlanpi-menud/get-core-token`, `/etc/sudoers.d/wlanpi-menud` | Root token helper; only `wlanpi` may run it, only without arguments |
+
+The package creates the `wlanpi-menud` group. Add SSH users who run the TUI
+to it (`sudo usermod -aG wlanpi-menud <user>`). It binds no TCP port, touches
+no hardware and shares no files with `wlanpi-fpms`, so both run side by side.
+`postinst` runs `wlanpi-menud --check` and will not restart the service on
+manifests that fail validation.
+
+## Building the Package
+
+```sh
+./build-package-native.sh        # Debian trixie container (podman or docker), runs lintian
+ls dist/                         # wlanpi-menud_<version>_<arch>.deb, lintian.txt
+```
+
+Or natively on trixie with `build-essential debhelper dh-virtualenv python3-venv`
+installed: `dpkg-buildpackage -us -uc -b`.
+
+## Releases
+
+Versions live in `debian/changelog` and match `pyproject.toml`. Add an entry with:
+
+```sh
+export DEBFULLNAME="Your Name" DEBEMAIL="you@example.com"
+dch -i            # or: dch -v <version>
+```
 
 ## Develop
 

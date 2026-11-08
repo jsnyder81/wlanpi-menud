@@ -1,0 +1,10 @@
+wlanpi-menud (0.1.0) unstable; urgency=medium
+
+  * Initial release: Phase 1 menu service (manifests, sessions, jobs,
+    local.sock and proxy.sock, core client).
+  * Debian packaging: dh-virtualenv under /opt/wlanpi-menud (Python 3.13),
+    systemd unit as wlanpi, tmpfiles.d runtime dir, get-core-token root
+    helper with sudoers entry, schemas and built-in manifests under
+    /usr/share/wlanpi-menud.
+
+ -- Jake Snyder <jsnyder81@gmail.com>  Sun, 08 Nov 2026 20:29:08 +0000

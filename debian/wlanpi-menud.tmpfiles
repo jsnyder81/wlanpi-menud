@@ -1,0 +1,5 @@
+# /run/wlanpi-menud holds local.sock and proxy.sock. The unit's
+# RuntimeDirectory= recreates it on start; this entry makes it exist from
+# boot so surfaces can find it. 0755: the sockets' own 0660 modes and
+# groups decide who may connect (nginx must traverse to reach proxy.sock).
+d /run/wlanpi-menud 0755 wlanpi wlanpi-menud -

@@ -12,6 +12,7 @@ registered.
 from __future__ import annotations
 
 import json
+import os
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -20,9 +21,23 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-PROTOCOL_DIR = Path(__file__).resolve().parent.parent / "protocol"
-if not PROTOCOL_DIR.is_dir():  # installed wheel: schemas ship inside the package
-    PROTOCOL_DIR = Path(__file__).resolve().parent / "protocol"
+SHARED_PROTOCOL_DIR = Path("/usr/share/wlanpi-menud/protocol")
+
+
+def _find_protocol_dir() -> Path:
+    """Locate the schemas: $WLANPI_MENUD_PROTOCOL_DIR, else the checkout, the
+    package, or the .deb's /usr/share copy (the venv does not carry them)."""
+    if env := os.environ.get("WLANPI_MENUD_PROTOCOL_DIR"):
+        return Path(env)
+    here = Path(__file__).resolve().parent
+    candidates = (here.parent / "protocol", here / "protocol", SHARED_PROTOCOL_DIR)
+    for d in candidates:
+        if (d / "menu.schema.json").is_file():
+            return d
+    return candidates[0]
+
+
+PROTOCOL_DIR = _find_protocol_dir()
 
 _PLACEHOLDER = re.compile(r"\{([^}]*)\}")
 _SEGMENT = re.compile(r"^[a-z][a-z0-9_]*$")

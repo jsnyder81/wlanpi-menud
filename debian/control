@@ -1,0 +1,34 @@
+Source: wlanpi-menud
+Section: contrib/python
+Priority: optional
+Maintainer: Jake Snyder <jsnyder81@gmail.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-virtualenv (>= 1.2),
+               python3 (>= 3.13),
+               python3-dev,
+               python3-setuptools,
+               python3-venv
+Standards-Version: 4.6.0
+Rules-Requires-Root: no
+X-Python3-Version: >= 3.13
+Homepage: https://github.com/WLAN-Pi/wlanpi-menud
+
+Package: wlanpi-menud
+Architecture: any
+Pre-Depends: dpkg (>= 1.16.1),
+             python3 (>= 3.13),
+             ${misc:Pre-Depends}
+Depends: passwd,
+         sudo,
+         systemd,
+         wlanpi-core,
+         ${misc:Depends},
+         ${shlibs:Depends}
+Description: WLAN Pi menu service
+ Headless menu service for the WLAN Pi. It owns the menu manifests,
+ sessions and jobs, and serves every surface (TUI, WebUI, front panel,
+ mobile) over one authenticated WebSocket protocol on Unix sockets under
+ /run/wlanpi-menud. Every device operation is delegated to wlanpi-core.
+ .
+ The service binds no TCP port and touches no hardware, so it installs
+ and runs alongside wlanpi-fpms without interfering with it.
