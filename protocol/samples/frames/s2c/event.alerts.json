@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:9",
+  "topic": "alerts",
+  "seq": 3,
+  "data": [
+    { "level": "warn", "message": "NO INTERNET" },
+    { "level": "info", "message": "PROFILER ACTIVE" }
+  ]
+}

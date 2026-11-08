@@ -10,7 +10,7 @@ the gap.
 | Socket | Who | Auth |
 | --- | --- | --- |
 | `/run/wlanpi-menud/local.sock` | TUI, panel, local providers, WebUI backend (logout) | Kernel `SO_PEERCRED` uid and gid. No `auth` frame. |
-| `/run/wlanpi-menud/proxy.sock` (mode 0660, nginx group) | nginx `/ui/ws`: WebUI browsers, later the mobile app | `X-WebUI-User` and `X-WebUI-Session` from nginx `auth_request`, or a core JWT in the first frame. Peer credentials ignored. `Origin` must match the device host (else close 1008). |
+| `/run/wlanpi-menud/proxy/proxy.sock` (mode 0660, nginx group, in a setgid `www-data` directory) | nginx `/ui/ws`: WebUI browsers, later the mobile app | `X-WebUI-User` and `X-WebUI-Session` from nginx `auth_request`, or a core JWT in the first frame. Peer credentials ignored. `Origin` must match the device host (else close 1008). |
 
 The service has no TCP listener. Each WebSocket message is one JSON frame,
 `{"v":1, "type":..., "id":..., ...}`.
@@ -93,6 +93,12 @@ rich session is `BAD_REQUEST`. Two thin sessions never share a cursor.
 - The service picks a new random `epoch` each time it starts.
 - `event.seq` starts at 1 per topic per epoch and increments by one for each
   change the service publishes. The service publishes only on change.
+- The four built-in topics have typed `data` in `frames.schema.json`:
+  `device.summary` (`topic_device_summary`), `alerts` (`topic_alerts`), `jobs`
+  (`topic_jobs`) and `complications` (`topic_complications`: `app_id`,
+  `label`, `value`, `status`). Unknown keys fail validation, so a client or a
+  stub that drifts from the service is caught by the schema. Plugin topics
+  carry any JSON.
 - On reconnect the client sends `hello.resume` with the epoch, its session id
   and the last `seq` it saw per topic.
   - Same epoch and every topic's `seq` equals the server's latest: the session

@@ -7,10 +7,10 @@
   "snapshot": true,
   "data": [
     {
-      "provider": "acme",
-      "key": "uplink",
-      "text": "Uplink OK",
-      "ttl_sec": 30
+      "app_id": "acme",
+      "label": "Uplink",
+      "value": "OK",
+      "status": "ok"
     }
   ]
 }

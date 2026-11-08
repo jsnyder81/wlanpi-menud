@@ -567,6 +567,7 @@ class JobManager:
         if state != "result" and job.share_key and self._share.get(job.share_key) == job.id:
             del self._share[job.share_key]
         self._broadcast(job)
+        self.service.job_finished(job)
 
     # ------------------------------------------------------------------ cancel, page, cleanup
 

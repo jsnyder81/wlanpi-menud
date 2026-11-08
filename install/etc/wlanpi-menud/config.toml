@@ -5,7 +5,7 @@
 # override_dir = "/etc/wlanpi-menud/menu.d"
 
 # local_sock = "/run/wlanpi-menud/local.sock"
-# proxy_sock = "/run/wlanpi-menud/proxy.sock"
+# proxy_sock = "/run/wlanpi-menud/proxy/proxy.sock"
 # local_sock_group = "wlanpi-menud"
 # proxy_sock_group = "www-data"      # nginx's group
 

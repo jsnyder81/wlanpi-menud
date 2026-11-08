@@ -7,6 +7,23 @@ if [ "$1" = "purge" ]; then
     rm -rf /etc/wlanpi-menud/menu.d
     rmdir /etc/wlanpi-menud 2>/dev/null || true
     rm -rf /run/wlanpi-menud
+
+    # The local.sock group postinst created. Remove it only while nothing
+    # depends on it: no user lists it as a supplementary group (an admin who
+    # added SSH users keeps the group and their memberships) and no account
+    # has it as the primary group. Files under /run are gone with the package
+    # and nothing else is ever created with this group, so no orphaned gid is
+    # left behind. postrm purge must not fail on a missing tool, so every step
+    # is guarded.
+    if command -v groupdel >/dev/null 2>&1 && entry=$(getent group wlanpi-menud); then
+        members=$(echo "$entry" | cut -d: -f4)
+        gid=$(echo "$entry" | cut -d: -f3)
+        if [ -z "$members" ] && ! getent passwd | cut -d: -f4 | grep -qx "$gid"; then
+            groupdel wlanpi-menud || echo "wlanpi-menud: could not remove group wlanpi-menud" >&2
+        else
+            echo "wlanpi-menud: keeping group wlanpi-menud, it still has members" >&2
+        fi
+    fi
 fi
 
 #DEBHELPER#

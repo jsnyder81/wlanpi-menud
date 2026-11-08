@@ -5,17 +5,21 @@ After=network.target wlanpi-core.service
 Wants=wlanpi-core.service
 
 [Service]
-Type=simple
+# READY=1 is sent once both sockets are bound (sd_notify, no libsystemd).
+Type=notify
+NotifyAccess=main
 User=wlanpi
 Group=wlanpi-menud
-# proxy.sock is chgrp'd to nginx's group (www-data), which needs membership.
-SupplementaryGroups=www-data
-# local.sock and proxy.sock live here; systemd creates and removes it.
-# 0755 so nginx can reach proxy.sock: each socket's 0660 mode and group
-# decide who may connect.
+# local.sock lives here, proxy.sock in proxy/ below it. systemd creates and
+# removes the top directory; 0750 so only wlanpi-menud members can list it.
 RuntimeDirectory=wlanpi-menud
-RuntimeDirectoryMode=0755
+RuntimeDirectoryMode=0750
 UMask=0007
+# Root, unsandboxed ("+"): add nginx's traverse-only ACL to the directory and
+# create the setgid www-data proxy/ directory (see tmpfiles.d/wlanpi-menud.conf).
+# proxy.sock inherits group www-data from it, so the service needs no
+# SupplementaryGroups=www-data.
+ExecStartPre=+/usr/bin/systemd-tmpfiles --create wlanpi-menud.conf
 ExecStart=/opt/wlanpi-menud/bin/wlanpi-menud --config /etc/wlanpi-menud/config.toml
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
@@ -51,7 +55,16 @@ IPAddressDeny=any
 IPAddressAllow=localhost
 # sudo keeps its timestamp records here.
 ReadWritePaths=-/run/sudo
-MemoryMax=96M
+
+# Resource budget (docs/resource-budget.md). Steady RSS is about 42 MiB and
+# the budgeted peak is 96 MiB; MemoryHigh starts reclaim above that and
+# MemoryMax is the hard line. Both are inert on images that boot with
+# cgroup_disable=memory (the 26.10 image does); the budget doc says how to
+# measure there.
+MemoryHigh=80M
+MemoryMax=112M
+# Core and capture work win under contention (default weight is 100).
+CPUWeight=50
 
 [Install]
 WantedBy=multi-user.target

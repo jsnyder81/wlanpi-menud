@@ -75,6 +75,7 @@ class CoreClient(GeneratedCoreAPI):
         prefix: str = "/api/v1",
         cert: Path | None = None,
         timeout: float = 10.0,
+        keepalive: float = 55.0,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
         self.base_url = base_url.rstrip("/")
@@ -90,7 +91,11 @@ class CoreClient(GeneratedCoreAPI):
                 # Without the pinned cert every request fails; never fall back to other trust.
                 log.error("cannot load pinned core certificate %s: %s", cert, exc)
                 self._cert_error = str(exc)
-        self._http = httpx.AsyncClient(base_url=self.base_url, verify=verify, timeout=timeout, transport=transport)
+        # One small pool kept warm across poll ticks: TLS handshakes are the
+        # most expensive part of a tick on a Pi.
+        limits = httpx.Limits(max_connections=8, max_keepalive_connections=8, keepalive_expiry=keepalive)
+        self._http = httpx.AsyncClient(base_url=self.base_url, verify=verify, timeout=timeout, limits=limits,
+                                       transport=transport)
 
     async def aclose(self) -> None:
         await self._http.aclose()

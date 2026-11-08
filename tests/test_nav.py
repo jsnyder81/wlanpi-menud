@@ -168,6 +168,7 @@ async def test_menu_follows_device_mode(harness):
     first = await c.expect(type="menu")
     assert any(n["id"] == "apps" for n in first["nodes"])
     harness.fake.mode = "hotspot"
+    harness.poller.invalidate_context()  # a mode switch made outside the menu
     await harness.poller.poll_once()
     m = await c.expect(type="menu")
     ids = {n["id"] for n in m["nodes"]}

@@ -6,8 +6,18 @@
   "seq": 42,
   "data": {
     "hostname": "wlanpi-a1b2",
+    "model": "M4+",
     "mode": "classic",
-    "eth0": "192.0.2.10",
-    "cpu_temp": "48.2C"
+    "software_version": "3.4.0",
+    "ip": "192.0.2.10",
+    "cpu": "3%",
+    "cpu_temp": "48.2C",
+    "uptime": "2h 4m",
+    "battery": null,
+    "bluetooth_on": true,
+    "profiler_running": false,
+    "reachable": true,
+    "wlan_adapters": ["wlan0"],
+    "hotspot_clients": null
   }
 }

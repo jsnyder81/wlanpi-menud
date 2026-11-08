@@ -36,7 +36,7 @@ Two findings:
 | --- | --- | --- | --- |
 | Steady RSS (idle, menu loaded, 1 to 2 sessions) | **≤ 64 MiB** | **≤ 48 MiB** | **≤ 112 MiB** |
 | Peak RSS (16 sessions, a paged 500-network scan, a speedtest) | ≤ 96 MiB | ≤ 64 MiB | ≤ 160 MiB |
-| systemd `MemoryHigh` / `MemoryMax` | 80M / 112M | n/a (user process); the TUI drops cached result pages beyond 4 | |
+| systemd `MemoryHigh` / `MemoryMax` | 80M / 112M (inert where the image disables the memory cgroup, see below) | n/a (user process); the TUI drops cached result pages beyond 4 | |
 | Idle CPU (60 s average, nothing on screen changing) | ≤ 1 % of one core | ≤ 0.5 % of one core | ≤ 1.5 % |
 | CPU while a job runs | Not capped by quota; `CPUWeight=50` so core and capture work win | Render only | |
 | Start to ready | ≤ 5 s (`Type=notify`) | ≤ 3 s to first view | |
@@ -58,19 +58,51 @@ On a 512 MiB board, 112 MiB steady is about 22 % of RAM. Treat it as the hard li
 
 ### What drives CPU, and the bounds
 
-- **One polling loop** (until core has an event stream): homepage and status every 5 s, profiler status every 2 s only while the home page or a profiler view is open on some session, hotspot clients only in hotspot mode (core returns 409 otherwise). Each tick is a few local HTTPS calls; publish only on change. That is roughly 1 to 3 core calls per second at worst, so idle service CPU stays well under 1 %.
+- **One polling loop** (until core has an event stream), in two tiers so an idle tick stays cheap:
+  - *Fast tier, every `poll_interval_sec` (5 s)*: `/system/device/stats`, `/system/battery`, `/profiler/status`, plus `/system/hotspot/clients` in hotspot mode only (core returns 409 otherwise). These are the homepage values that move.
+  - *Context tier, every `context_interval_sec` (30 s)*: `/system/device/info`, `/system/device/model`, `/bluetooth/status`, `/network/config/status`, `/network/interfaces`. These give identity, mode, Bluetooth power and adapters, which drive menu visibility. A **mutating job finishing** (mode switch, Bluetooth toggle, and so on) re-reads the context at once and wakes the loop, so menu changes made from the menu show up without the 30 s wait. Changes made outside the menu (a USB adapter plugged in, a mode set over SSH) show up within 30 s. A failed stats read also re-reads the context in the same tick, so "core is down" is still detected within one tick.
+  - Reachability every 60 s, the OpenAPI route table every 10 minutes (retried after 60 s, not every tick, when core's answer is unusable).
+  - That is about 0.8 core calls/s at idle (was 1.3–1.8 with every endpoint on every tick). Topics publish only on change; `device.summary` still changes most ticks, because cpu and temperature move.
 - **No per-session timers.** Thin views are re-rendered only on input or when a subscribed value changes.
-- **TLS to core**: keep one pooled httpx client with keep-alive, so the handshake cost is paid once rather than per call.
+- **TLS to core**: one pooled httpx client, keep-alive **55 s** (`core_keepalive_sec`). httpx's default keep-alive expiry is 5 s, the same as the poll interval, so before this fix the pool had dropped every connection by the next tick and *every* core call paid a full TLS handshake. That was the main cause of the 8–12 % spikes per tick seen on the M4+. 55 s stays under nginx's `keepalive_timeout` (65 s on Debian), so the client always closes first and never reuses a socket nginx has just closed.
+- **Logging**: httpx and httpcore log at WARNING unless `--log-level DEBUG`. At INFO they wrote one journal line per core call, about 4,300 lines an hour, and that cost CPU in journald as well as in the service.
 - **TUI**: Textual renders only on change; no polling (surfaces never poll).
 
+### Idle CPU: before and after the poll-loop fix
+
+Method (`tools/idle_bench/bench.py`): `wlanpi-menud` runs as a real process (`python -m wlanpi_menud`, INFO logging) against an **HTTPS** fake core: stdlib `http.server`, HTTP/1.1 keep-alive, a self-signed RSA-2048 cert pinned through `core_cert`, the vendored OpenAPI route table, and M4+-shaped payloads with cpu and temperature changing on every call. Two idle clients stay connected throughout (one thin on the home screen, one rich subscribed to all four topics, as the TUI is). After 12 s of warm-up, service CPU is `utime + stime` from `/proc/<pid>/stat` over a 90 s window. The fake core counts calls and new TLS connections. "Before" is commit 7f34921 run from a git worktree with the same venv. The dev host is aarch64 (12 cores, CPython 3.13.14), so absolute numbers are lower than on a CM4. The ratios and the call and handshake counts carry over.
+
+| 90 s idle window | Before (7f34921) | After |
+| --- | --- | --- |
+| Service CPU, % of one core | 0.71, 0.68, 0.86 (mean 0.75) | 0.21, 0.40, 0.20, 0.39 (mean 0.30) |
+| Core calls per second | 1.34 | 0.78 (3 per 5 s tick + 5 per 30 s + reachability) |
+| New TLS connections | 120 (every call) | 0 |
+| Journal lines (whole run) | 169 | 22 |
+| RSS | 45–47 MiB | 44–45 MiB |
+
+On the M4+ (`wlanpi-9be`, 2026-11-08) the service measured 1.9–2.2 % idle before the fix. Per-call handshakes cost relatively more on a Cortex-A72 than on the dev host, so the drop on the board should be at least as large. **Re-measure on the board** with `pidstat -p $(systemctl show -p MainPID --value wlanpi-menud) 60 1` before closing the Phase 1 CPU line.
+
+## systemd unit vs this budget
+
+The unit (`install/lib/systemd/system/wlanpi-menud.service`) now carries the budget's values:
+
+| Setting | Budget | Unit | Note |
+| --- | --- | --- | --- |
+| `Type=` | `notify` | `notify`, `NotifyAccess=main` | The service sends `READY=1` itself once both sockets are bound (a datagram to `$NOTIFY_SOCKET`, no libsystemd), and `STOPPING=1` on shutdown. The start-to-ready time includes the first poll (up to 15 s if core is slow). |
+| `MemoryHigh=` / `MemoryMax=` | 80M / 112M | 80M / 112M | Was `MemoryMax=96M` with no `MemoryHigh`; 96 MiB is the *peak RSS* ceiling, not the cgroup limit. |
+| `CPUWeight=` | 50 | 50 | Was missing (default 100). |
+
+**The memory limits are not enforced on the current WLAN Pi image.** The 26.10 image boots with `cgroup_disable=memory` on the kernel command line (seen on `wlanpi-9be`), so the memory controller is off: `MemoryHigh=` and `MemoryMax=` are accepted but do nothing, and `memory.current` and `memory.peak` do not exist. The limits stay in the unit so that they apply on any image that enables the controller. Until then the RSS ceilings are checked by measurement only (below), and a leak would surface as OOM pressure on the whole board rather than a contained restart. `CPUWeight=` needs only the cpu controller and does apply.
+
+## Measurement plan (Phase 1 exit)
 ## Measurement plan (Phase 1 exit)
 
 Run on every supported model, starting with the smallest:
 
-1. Boot, start `wlanpi-menud`, wait 10 minutes idle. Record `memory.current` and `memory.peak` from `/sys/fs/cgroup/system.slice/wlanpi-menud.service/`, PSS from `smem -P wlanpi-menud`, and CPU with `pidstat -p <pid> 60 10`.
+1. Boot, start `wlanpi-menud`, wait 10 minutes idle. Record PSS from `smem -P wlanpi-menud`, `VmRSS`/`VmHWM` from `/proc/<pid>/status`, and CPU with `pidstat -p <pid> 60 10`. Where the memory controller is enabled, also record `memory.current` and `memory.peak` from `/sys/fs/cgroup/system.slice/wlanpi-menud.service/`. On images booted with `cgroup_disable=memory` (26.10) those files do not exist; use `VmHWM` as the peak.
 2. Two TUI sessions over SSH, navigating independently for 5 minutes (scripted key presses). Record TUI PSS and service CPU.
 3. Run a scan (paged through), a speedtest and a profiler start/stop. Record peaks.
-4. Connect 16 thin clients that read slowly (a test client with a 100 ms read delay). Check the service stays under `MemoryHigh` and that the other sessions' latency stays within budget.
+4. Connect 16 thin clients that read slowly (a test client with a 100 ms read delay). Check the service stays under `MemoryHigh` (by `VmHWM` where the memory cgroup is off) and that the other sessions' latency stays within budget.
 5. Record the same figures for today's FPMS on the same board as the reference.
 
 Fail the exit if any steady figure goes over its ceiling. CI should run the same scripted scenario against a mocked core on aarch64 and fail on a regression of more than 10 %.

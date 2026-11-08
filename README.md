@@ -60,11 +60,13 @@ systemctl status wlanpi-menud
 | `/etc/wlanpi-menud/menu.d/` | Local manifest overrides |
 | `/usr/share/wlanpi-menud/menu.d/`, `plugins.d/`, `protocol/` | Built-in manifests, plugin manifests, schemas |
 | `/usr/lib/systemd/system/wlanpi-menud.service` | Runs as `wlanpi`, group `wlanpi-menud`, sandboxed |
-| `/run/wlanpi-menud/` | `local.sock` (0660, group `wlanpi-menud`) and `proxy.sock` (0660, group `www-data`) |
+| `/run/wlanpi-menud/` | 0750 `wlanpi:wlanpi-menud`, plus a traverse-only ACL for `www-data`; holds `local.sock` (0660, group `wlanpi-menud`) |
+| `/run/wlanpi-menud/proxy/` | 2750 `wlanpi:www-data` (setgid, made by `tmpfiles.d` as root); holds `proxy.sock` (0660, group `www-data` by inheritance). nginx proxies `/ui/ws` here. |
 | `/usr/libexec/wlanpi-menud/get-core-token`, `/etc/sudoers.d/wlanpi-menud` | Root token helper; only `wlanpi` may run it, only without arguments |
 
 The package creates the `wlanpi-menud` group. Add SSH users who run the TUI
-to it (`sudo usermod -aG wlanpi-menud <user>`). It binds no TCP port, touches
+to it (`sudo usermod -aG wlanpi-menud <user>`); `wlanpi` itself connects as the
+socket's owner. Purge removes the group unless users were added to it. It binds no TCP port, touches
 no hardware and shares no files with `wlanpi-fpms`, so both run side by side.
 `postinst` runs `wlanpi-menud --check` and will not restart the service on
 manifests that fail validation.

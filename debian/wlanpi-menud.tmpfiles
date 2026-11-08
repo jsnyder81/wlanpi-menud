@@ -1,5 +1,13 @@
-# /run/wlanpi-menud holds local.sock and proxy.sock. The unit's
-# RuntimeDirectory= recreates it on start; this entry makes it exist from
-# boot so surfaces can find it. 0755: the sockets' own 0660 modes and
-# groups decide who may connect (nginx must traverse to reach proxy.sock).
-d /run/wlanpi-menud 0755 wlanpi wlanpi-menud -
+# /run/wlanpi-menud holds local.sock; /run/wlanpi-menud/proxy holds proxy.sock.
+# Installed as /usr/lib/tmpfiles.d/wlanpi-menud.conf. Applied at boot, and by
+# the unit's ExecStartPre=+ on every start, because RuntimeDirectory= recreates
+# the top directory without the ACL or the subdirectory.
+#
+# 0750 wlanpi:wlanpi-menud: only the service and wlanpi-menud members may list
+# it. nginx (www-data) gets traverse only (--x) through a POSIX ACL, enough to
+# reach proxy/ and no more.
+d  /run/wlanpi-menud        0750 wlanpi wlanpi-menud -
+a+ /run/wlanpi-menud        -    -      -            - group:www-data:--x
+# setgid, group www-data: proxy.sock inherits group www-data when it is bound,
+# so the service never chowns it and needs no SupplementaryGroups=www-data.
+d  /run/wlanpi-menud/proxy  2750 wlanpi www-data     -

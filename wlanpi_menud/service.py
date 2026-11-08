@@ -53,7 +53,8 @@ class Service:
         self.sessions: dict[str, Session] = {}
         self.tokens = tokens or TokenSource(config.token_command, config.token_refresh_margin_sec)
         self.core = core or CoreClient(config.core_base_url, self.tokens, prefix=config.core_api_prefix,
-                                       cert=config.core_cert, timeout=config.core_timeout_sec)
+                                       cert=config.core_cert, timeout=config.core_timeout_sec,
+                                       keepalive=config.core_keepalive_sec)
         self.introspector = Introspector(self.core, config.introspect_path, config.introspect_cache_sec)
         self.local_policy = LocalPolicy(config.local_uids, config.local_gids, config.provider_uids,
                                         config.local_user_names, config.local_group_names)
@@ -62,6 +63,7 @@ class Service:
         self.menu_revision = 0
         self.load: LoadResult = self._load_menu()
         self.complications: dict[str, dict[str, Any]] = {}
+        self.poller: Any = None  # the Poller sets itself here
 
     # ------------------------------------------------------------------ menu
 
@@ -157,6 +159,12 @@ class Service:
 
     def _publish_jobs(self) -> None:
         self.hub.publish("jobs", self.jobs.summary())
+
+    def job_finished(self, job: Job) -> None:
+        # Mode switches, Bluetooth toggles and the like change the device
+        # context; re-read it now instead of waiting for the slow tier.
+        if job.node.mutates and self.poller is not None:
+            self.poller.invalidate_context()
 
     def job_changed_for(self, session: Session, job: Job) -> None:
         if session.thin and session.cursor.job_id == job.id and session.cursor.screen in ("result", "prompt"):

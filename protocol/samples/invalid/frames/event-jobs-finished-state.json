@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:10",
+  "topic": "jobs",
+  "seq": 5,
+  "data": [{ "job_id": "j_7Kq2", "node": "apps.scanner.scan", "state": "result", "sessions": 1 }]
+}

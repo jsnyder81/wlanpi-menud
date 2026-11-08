@@ -48,6 +48,7 @@ async def test_running_shareable_read_is_attached_not_rerun(harness, fake):
 
 async def test_secret_result_never_shared_or_cached(harness, fake):
     fake.mode = "hotspot"
+    harness.poller.invalidate_context()
     await harness.poller.poll_once()
     a, b = await rich(harness), await rich(harness)
     ja = await invoke(a, "utils.ssid_passphrase")
@@ -175,6 +176,53 @@ async def test_needs_selection_prompts_then_reruns(harness, fake):
     assert req.url.params["iface"] == "wlan2" and req.url.params["namespace"] == "ns1"
     assert req.url.params["hidden"] == "false"
 
+
+
+async def test_needs_selection_thin_panel_select_then_rerun(harness, fake):
+    """The front-panel/thin path: core says needsSelection, the panel picks with keys, the scan reruns."""
+    fake.scan_candidates = [{"iface": "wlan1", "namespace": "root", "label": "wlan1 (mt7921u)"},
+                            {"iface": "wlan2", "namespace": "ns1", "label": "wlan2 (ns1)"}]
+    t = await harness.connect()
+    await t.hello()
+    j = await invoke(t, "apps.scanner.scan")
+    p = await t.expect(type="prompt")
+    assert p["kind"] == "select" and p["job_id"] == j["job_id"] and len(p["options"]) == 2
+    v = await t.expect(lambda f: f["screen"] == "prompt", type="view")
+    assert any("wlan2 (ns1)" in str(b) for b in v["blocks"])
+    await t.input("down")
+    await t.input("center")
+    r = await t.expect(lambda f: f["job_id"] == j["job_id"] and f["state"] in ("result", "error"), type="job")
+    assert r["state"] == "result"
+    scans = [c.request for c in fake.router.calls if "/utils/wlan/scan" in str(c.request.url)]
+    assert "iface" not in scans[-2].url.params  # first call: core asked which adapter
+    assert scans[-1].url.params["iface"] == "wlan2" and scans[-1].url.params["namespace"] == "ns1"
+
+
+async def test_needs_selection_cancelled_does_not_rerun(harness, fake):
+    fake.scan_candidates = [{"iface": "wlan1", "namespace": "root", "label": "wlan1"},
+                            {"iface": "wlan2", "namespace": "root", "label": "wlan2"}]
+    a = await rich(harness)
+    j = await invoke(a, "apps.scanner.scan")
+    p = await a.expect(type="prompt")
+    await a.send("answer", prompt_id=p["prompt_id"], cancel=True)
+    r = await final(a, j["job_id"])
+    assert r["state"] == "cancelled"
+    assert fake.calls["GET /utils/wlan/scan"] == 1
+
+
+async def test_needs_selection_twice_then_gives_up(harness, fake):
+    """Core keeps asking (adapter vanished between calls): at most two prompts, then the empty answer renders."""
+    fake.scan_candidates = [{"iface": "wlan1", "namespace": "root", "label": "wlan1"},
+                            {"iface": "wlan2", "namespace": "root", "label": "wlan2"}]
+    fake.scan_always_ask = True
+    a = await rich(harness)
+    j = await invoke(a, "apps.scanner.scan_nohidden")
+    for _ in range(2):
+        p = await a.expect(type="prompt")
+        await a.send("answer", prompt_id=p["prompt_id"], value={"iface": "wlan1", "namespace": "root"})
+    r = await final(a, j["job_id"])
+    assert r["state"] in ("result", "error")
+    assert fake.calls["GET /utils/wlan/scan"] == 3
 
 async def test_paging_first_page_and_cursor(harness, fake):
     fake.scan_networks = 45

@@ -4,7 +4,7 @@ set -e
 
 if [ "$1" = "configure" ]; then
     # local.sock group: members (root, wlanpi, SSH users running the TUI)
-    # may connect. Never removed on purge, per Debian policy.
+    # may connect. postrm removes it on purge unless users were added to it.
     if ! getent group wlanpi-menud >/dev/null; then
         groupadd --system wlanpi-menud
     fi

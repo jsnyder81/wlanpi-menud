@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .config import DEFAULT_CONFIG_FILE, load_config
 from .poller import Poller
+from .sdnotify import notify
 from .server import Server
 from .service import Service
 
@@ -35,8 +36,10 @@ async def run(config_path: Path) -> None:
     loop.add_signal_handler(signal.SIGINT, stop.set)
     loop.add_signal_handler(signal.SIGHUP, service.reload_menu)
     log.info("wlanpi-menud running, epoch %s", service.epoch)
+    notify(f"READY=1\nSTATUS=serving {len(service.menu)} menu nodes")  # sockets are bound: Type=notify
     await stop.wait()
     log.info("stopping")
+    notify("STOPPING=1")
     await service.aclose()
     await server.close()
     for t in tasks:
@@ -51,6 +54,11 @@ def main() -> None:
     ap.add_argument("--log-level", default="INFO")
     args = ap.parse_args()
     logging.basicConfig(level=args.log_level.upper(), format="%(levelname)s %(name)s: %(message)s")
+    if logging.getLogger().level > logging.DEBUG:
+        # httpx logs every request at INFO: about 4,300 journal lines an hour
+        # from the poll loop alone.
+        for name in ("httpx", "httpcore"):
+            logging.getLogger(name).setLevel(logging.WARNING)
     if args.check:
         from .handlers import handler_exists
         from .loader import load_menu

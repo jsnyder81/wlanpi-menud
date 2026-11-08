@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "c3",
+  "topic": "complications",
+  "seq": 7,
+  "data": [
+    { "provider": "acme", "key": "uplink", "text": "Uplink OK", "ttl_sec": 30 }
+  ]
+}

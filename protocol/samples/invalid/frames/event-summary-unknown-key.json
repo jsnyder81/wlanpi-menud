@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:7",
+  "topic": "device.summary",
+  "seq": 42,
+  "data": { "hostname": "wlanpi-a1b2", "eth0": "192.0.2.10" }
+}

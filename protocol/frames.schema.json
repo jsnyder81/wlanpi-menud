@@ -536,8 +536,26 @@
       }
     },
     "event": {
-      "description": "S to C. Topic data. seq starts at 1 per topic per epoch and increases by one per change the server publishes; the server publishes only on change. snapshot=true marks a full value (after subscribe, after a resync, or after this client's outbound queue overflowed and drained). When a client's bounded queue fills, its queued topic updates are dropped and it gets a snapshot once it drains; a gap in seq without snapshot=true means the client must treat its state as stale until the next snapshot.",
-      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "description": "S to C. Topic data. seq starts at 1 per topic per epoch and increases by one per change the server publishes; the server publishes only on change. snapshot=true marks a full value (after subscribe, after a resync, or after this client's outbound queue overflowed and drained). When a client's bounded queue fills, its queued topic updates are dropped and it gets a snapshot once it drains; a gap in seq without snapshot=true means the client must treat its state as stale until the next snapshot. The four built-in topics have typed data (topic_device_summary, topic_alerts, topic_jobs, topic_complications); other topics (plugins) carry any JSON.",
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "if": { "properties": { "topic": { "const": "device.summary" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_device_summary" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "alerts" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_alerts" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "jobs" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_jobs" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "complications" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_complications" } } }
+        }
+      ],
       "type": "object",
       "additionalProperties": false,
       "required": ["v", "type", "id", "topic", "seq", "data"],
@@ -549,6 +567,79 @@
         "seq": { "type": "integer", "minimum": 1 },
         "snapshot": { "type": "boolean", "default": false },
         "data": {}
+      }
+    },
+    "topic_device_summary": {
+      "description": "device.summary data. {} before the first poll; {\"core\": \"unavailable\"} while core is unreachable; otherwise the homepage values, each null when core did not answer. Strings are core's own formatting (cpu \"3%\", cpu_temp \"48.0C\").",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "core": { "const": "unavailable" },
+        "hostname": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "mode": { "type": ["string", "null"] },
+        "software_version": { "type": ["string", "null"] },
+        "ip": { "type": ["string", "null"] },
+        "cpu": { "type": ["string", "number", "null"] },
+        "cpu_temp": { "type": ["string", "number", "null"] },
+        "uptime": { "type": ["string", "number", "null"] },
+        "battery": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "present": { "type": ["boolean", "null"] },
+            "percent": { "type": ["number", "null"] },
+            "status": { "type": ["string", "null"] }
+          }
+        },
+        "bluetooth_on": { "type": ["boolean", "null"] },
+        "profiler_running": { "type": ["boolean", "null"] },
+        "reachable": { "type": ["boolean", "null"] },
+        "wlan_adapters": { "type": "array", "items": { "type": "string" } },
+        "hotspot_clients": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "topic_alerts": {
+      "description": "alerts data: the current alert lines, most important first. Empty when there is nothing to show.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["level", "message"],
+        "properties": {
+          "level": { "enum": ["info", "warn", "error"] },
+          "message": { "type": "string", "maxLength": 64 }
+        }
+      }
+    },
+    "topic_jobs": {
+      "description": "jobs data: every live job on the device, whoever started it. sessions is how many sessions are attached.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["job_id", "node", "state", "sessions"],
+        "properties": {
+          "job_id": { "type": "string" },
+          "node": { "$ref": "#/$defs/node_id" },
+          "state": { "enum": ["queued", "progress"] },
+          "sessions": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "topic_complications": {
+      "description": "complications data: one entry per provider app, sorted by app_id, already past its TTL check. label is at most 8 characters (front-panel width).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["app_id", "label", "value", "status"],
+        "properties": {
+          "app_id": { "type": "string" },
+          "label": { "type": "string", "maxLength": 8 },
+          "value": { "type": "string" },
+          "status": { "type": "string" }
+        }
       }
     },
     "error_code": {

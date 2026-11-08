@@ -6,6 +6,13 @@ Surfaces never poll. The same loop learns the device context (mode, model
 capabilities, the routes core advertises) that drives menu visibility, and
 does housekeeping (complication TTLs, finished jobs, detached sessions).
 
+Ticks are tiered so an idle tick stays cheap: the values on the homepage that
+move (stats, battery, profiler state, hotspot clients) are read every
+``poll_interval_sec``; the device context (identity, mode, Bluetooth,
+adapters, interfaces) only every ``context_interval_sec`` or right after a
+mutating job finishes, since that is how mode, Bluetooth and adapters change
+from the menu.
+
 Secrets never go into topics: no hotspot or profiler passphrases here.
 """
 
@@ -27,6 +34,7 @@ log = logging.getLogger(__name__)
 # core/transmit_policy.py: hostapd, wpa_supplicant and Bluetooth units are refused elsewhere.
 TRANSMIT_ALLOWED_MODELS = frozenset({"M4", "M4+", "R4", "R5", "Pro"})
 ROUTES_REFRESH_SEC = 600.0
+ROUTES_RETRY_SEC = 60.0
 
 
 class Poller:
@@ -36,6 +44,15 @@ class Poller:
         self._reach_at = 0.0
         self._reach: bool | None = None
         self._routes_at = 0.0
+        self._context_at = 0.0
+        self._context: tuple[Any, ...] = (None,) * 5  # info, model, bt, adapters, ifaces
+        self._wake = asyncio.Event()
+        service.poller = self
+
+    def invalidate_context(self) -> None:
+        """Re-read the device context on the next tick, and run that tick now."""
+        self._context_at = 0.0
+        self._wake.set()
 
     async def _get(self, method: str, path: str, **kw: Any) -> Any:
         try:
@@ -55,17 +72,27 @@ class Poller:
             if isinstance(doc, dict) and doc.get("paths"):
                 svc.set_routes(RouteTable.from_openapi(doc, svc.config.core_api_prefix))
                 self._routes_at = now
+            else:
+                # Keep the vendored table and retry in a minute, not every tick.
+                self._routes_at = now - ROUTES_REFRESH_SEC + ROUTES_RETRY_SEC
 
-        info, model, stats, battery, bt, prof, adapters, ifaces = await asyncio.gather(
-            self._get("GET", "/system/device/info"),
-            self._get("GET", "/system/device/model"),
+        stats, battery, prof = await asyncio.gather(
             self._get("GET", "/system/device/stats"),
             self._get("GET", "/system/battery"),
-            self._get("GET", "/bluetooth/status"),
             self._get("GET", "/profiler/status"),
-            self._get("GET", "/network/config/status"),
-            self._get("GET", "/network/interfaces"),
         )
+        # A failed stats read also re-reads the context: it tells "core is
+        # down" apart from one endpoint failing.
+        if stats is None or now - self._context_at >= svc.config.context_interval_sec:
+            self._context = tuple(await asyncio.gather(
+                self._get("GET", "/system/device/info"),
+                self._get("GET", "/system/device/model"),
+                self._get("GET", "/bluetooth/status"),
+                self._get("GET", "/network/config/status"),
+                self._get("GET", "/network/interfaces"),
+            ))
+            self._context_at = now if self._context[0] is not None else 0.0
+        info, model, bt, adapters, ifaces = self._context
         if info is None and stats is None:
             svc.hub.publish("device.summary", {"core": "unavailable"})
             svc.hub.publish("alerts", [{"level": "error", "message": "wlanpi-core unavailable"}])
@@ -153,10 +180,14 @@ class Poller:
 
     async def run(self) -> None:
         while True:
+            self._wake.clear()
             try:
                 await self.poll_once()
             except asyncio.CancelledError:
                 raise
             except Exception:
                 log.exception("poll failed")
-            await asyncio.sleep(self.service.config.poll_interval_sec)
+            try:
+                await asyncio.wait_for(self._wake.wait(), self.service.config.poll_interval_sec)
+            except TimeoutError:
+                pass

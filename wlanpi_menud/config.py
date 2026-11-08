@@ -23,7 +23,7 @@ class Config:
 
     # Sockets. There is deliberately no TCP listener.
     local_sock: Path = Path("/run/wlanpi-menud/local.sock")
-    proxy_sock: Path = Path("/run/wlanpi-menud/proxy.sock")
+    proxy_sock: Path = Path("/run/wlanpi-menud/proxy/proxy.sock")  # setgid www-data dir
     local_sock_mode: int = 0o660
     proxy_sock_mode: int = 0o660
     local_sock_group: str | None = "wlanpi-menud"
@@ -53,6 +53,11 @@ class Config:
     token_command: tuple[str, ...] = ("sudo", "-n", "/usr/libexec/wlanpi-menud/get-core-token")
     token_refresh_margin_sec: float = 300.0
     core_timeout_sec: float = 10.0
+    # Idle pooled connections to core live this long. It must exceed
+    # poll_interval_sec, or every tick pays a TLS handshake (httpx's default
+    # is 5 s, the same as the poll interval), and stay under nginx's
+    # keepalive_timeout (65 s on Debian) so core never closes one first.
+    core_keepalive_sec: float = 55.0
     openapi_snapshot: Path | None = None  # None: the vendored route table
 
     # Sessions, queues and paging.
@@ -67,6 +72,9 @@ class Config:
     # Polling loop.
     poll_interval_sec: float = 5.0
     reachability_interval_sec: float = 60.0
+    # Device identity, mode, Bluetooth, adapters and interfaces. Mutating jobs
+    # force an early re-read, so this only bounds changes made outside the menu.
+    context_interval_sec: float = 30.0
     job_retention_sec: float = 600.0
 
     # Static device facts the service cannot learn from core.

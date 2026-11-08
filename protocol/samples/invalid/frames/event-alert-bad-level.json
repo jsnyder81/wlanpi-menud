@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:9",
+  "topic": "alerts",
+  "seq": 3,
+  "data": [{ "level": "critical", "message": "NO INTERNET" }]
+}

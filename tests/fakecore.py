@@ -43,6 +43,7 @@ class FakeCore:
         self.reject_next: list[str] = []  # queue of "401" / "clock" for service-token calls
         self.scan_candidates: list[dict[str, Any]] | None = None
         self.scan_networks = 3
+        self.scan_always_ask = False  # keep answering needsSelection even with an iface
         self.scan_conflict = False
         self.scan_delay = 0.0
         self.speedtest_delay = 0.0
@@ -161,7 +162,7 @@ class FakeCore:
         if self.scan_conflict:
             return httpx.Response(409, json={"detail": "A scan is already running on wlan1"})
         iface = request.url.params.get("iface")
-        if self.scan_candidates and not iface:
+        if self.scan_candidates and (not iface or self.scan_always_ask):
             return {"detail": "short", "selectedAdapter": None, "networks": [], "scannedAt": None,
                     "needsSelection": True, "candidates": self.scan_candidates}
         nets = [{"ssid": f"net{i:03d}", "bssid": f"02:00:00:00:{i // 256:02x}:{i % 256:02x}", "channel": 1 + i % 11,

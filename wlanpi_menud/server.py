@@ -100,8 +100,13 @@ class Server:
         )
         os.chmod(path, mode)
         if group:
+            # proxy.sock sits in a setgid www-data directory that root creates
+            # (tmpfiles.d), so the kernel already gave it the right group and
+            # the service needs no membership in www-data. chown only if not.
             try:
-                os.chown(path, -1, grp.getgrnam(group).gr_gid)
+                gid = grp.getgrnam(group).gr_gid
+                if os.stat(path).st_gid != gid:
+                    os.chown(path, -1, gid)
             except (KeyError, PermissionError) as exc:
                 log.warning("%s: cannot set group %s (%s)", path, group, exc)
         log.info("listening on %s (%s, mode %o)", path, kind, mode)
