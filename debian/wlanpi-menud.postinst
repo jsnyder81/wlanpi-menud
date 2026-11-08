@@ -19,6 +19,15 @@ if [ "$1" = "configure" ]; then
         echo "wlanpi-menud: shipped menu manifests failed validation; not restarting" >&2
         exit 1
     fi
+
+    # Enable WebUI proxy snippet if wlanpi-webui is installed
+    if [ -f /etc/wlanpi-webui/nginx/conf-available/wlanpi-menud.conf ]; then
+        mkdir -p /etc/wlanpi-webui/nginx/conf.d
+        ln -sf /etc/wlanpi-webui/nginx/conf-available/wlanpi-menud.conf /etc/wlanpi-webui/nginx/conf.d/wlanpi-menud.conf
+        if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet nginx.service; then
+            systemctl reload nginx.service || true
+        fi
+    fi
 fi
 
 #DEBHELPER#

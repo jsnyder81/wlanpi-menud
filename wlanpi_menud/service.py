@@ -390,6 +390,13 @@ class Service:
                     session.drove(a)
                     session.cursor = replace(session.cursor, screen="menu", job_id=None, node=None)
                     self.push_view(session)
+            elif t == "revoke":
+                if a.socket_kind != "local" or "admin" not in a.principal.roles:
+                    raise InvokeRefused("FORBIDDEN", "revoke is restricted to the webui principal on local.sock")
+                target = frame.get("webui_session")
+                if not isinstance(target, str) or not target:
+                    raise InvokeRefused("BAD_REQUEST", "webui_session is required")
+                self.revoke_webui_session(target)
             elif t in ("hello", "auth"):
                 raise InvokeRefused("BAD_REQUEST", f"{t} is only valid once, at the start")
         except InvokeRefused as exc:

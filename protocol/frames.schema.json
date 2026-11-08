@@ -13,6 +13,7 @@
     { "$ref": "#/$defs/answer" },
     { "$ref": "#/$defs/page" },
     { "$ref": "#/$defs/cancel" },
+    { "$ref": "#/$defs/revoke" },
     { "$ref": "#/$defs/welcome" },
     { "$ref": "#/$defs/menu" },
     { "$ref": "#/$defs/view" },
@@ -333,6 +334,20 @@
         "id": true,
         "type": { "const": "cancel" },
         "job_id": { "$ref": "#/$defs/job_id" }
+      }
+    },
+
+    "revoke": {
+      "description": "C to S, admin only on local.sock (WebUI logout). Closes every connection and independent session carrying that WebUI session id (close code 4401). No reply on success; error frame on failure.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "webui_session"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "revoke" },
+        "webui_session": { "type": "string", "minLength": 1, "maxLength": 256 }
       }
     },
 

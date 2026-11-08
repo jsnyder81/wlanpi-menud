@@ -140,6 +140,40 @@ async def test_webui_logout_closes_that_sessions_connections(harness):
     assert not b.closed.is_set()
 
 
+async def test_revoke_frame_closes_matching_sessions_only(harness):
+    hdr = {"X-WebUI-User": "alice", "X-WebUI-Session": "S1"}
+    a1 = await harness.connect("proxy", headers=hdr)
+    a2 = await harness.connect("proxy", headers=hdr)
+    b = await harness.connect("proxy", headers={"X-WebUI-User": "bob", "X-WebUI-Session": "S2"})
+    for c in (a1, a2, b):
+        await c.hello("rich")
+
+    admin = await harness.connect("local")
+    await admin.hello("rich")
+    await admin.send("revoke", webui_session="S1")
+
+    assert await a1.wait_closed() == 4401 and await a2.wait_closed() == 4401
+    await asyncio.sleep(0.05)
+    assert not b.closed.is_set()
+
+
+async def test_revoke_frame_non_webui_principal_forbidden(harnesses):
+    h = await harnesses(local_uids={}, local_gids={os.getgid(): ("operator",)})
+    c = await h.connect("local")
+    await c.hello("rich")
+    await c.send("revoke", webui_session="S1")
+    err = await c.expect(type="error")
+    assert err["code"] == "FORBIDDEN"
+
+
+async def test_revoke_frame_on_proxy_forbidden(harness):
+    c = await harness.connect("proxy", headers={"X-WebUI-User": "alice", "X-WebUI-Session": "S1"})
+    await c.hello("rich")
+    await c.send("revoke", webui_session="S1")
+    err = await c.expect(type="error")
+    assert err["code"] == "FORBIDDEN"
+
+
 async def test_frame_before_hello_is_version_error(harness):
     c = await harness.connect()
     await c.send("subscribe", topics=["alerts"])

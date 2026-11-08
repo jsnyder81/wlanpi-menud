@@ -245,12 +245,16 @@ failure has a typed code.
   route is not in core's OpenAPI document.
 - Path placeholders must be valid parameter names bound to `path`.
 
+## WebUI logout and revocation
+
+- `revoke`: C to S frame on `local.sock`, restricted to the WebUI principal
+  (`admin` role on `local.sock`). Carries `{"v":1, "type":"revoke", "id":..., "webui_session":...}`.
+  Tells wlanpi-menud to close every connection and independent session bound to
+  that WebUI session id (`Service.revoke_webui_session`, close code 4401).
+  No reply on success; non-admin callers or calls over `proxy.sock` are refused
+  with an `error` frame with code `FORBIDDEN`.
+
 ## Not yet in the protocol
 
-- WebUI logout: the plan has the WebUI backend tell wlanpi-menud over
-  `local.sock` to close every session with a WebUI session id. The service
-  implements it (`Service.revoke_webui_session`, close 4401), but there is
-  no frame for it yet; it needs a `revoke` request reserved for the WebUI
-  backend's uid. Decide with the WebUI work (Phase 2).
 - Provider registration and `publish` (Phase 6). Complications already
   have TTL handling in the service (`Service.publish_complication`).

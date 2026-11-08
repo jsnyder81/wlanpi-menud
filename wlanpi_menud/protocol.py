@@ -12,7 +12,7 @@ from .manifest import load_schema
 
 VERSION = 1
 SUPPORTED = (1,)
-C2S = ("auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel")
+C2S = ("auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel", "revoke")
 S2C = ("welcome", "menu", "view", "prompt", "job", "event", "error")
 
 FATAL_CLOSE = {"AUTH_FAILED": 4401, "VERSION": 4426}
