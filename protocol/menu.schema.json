@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
   "title": "wlanpi-menud menu manifest",
-  "description": "One manifest file in /usr/share/wlanpi-menud/menu.d/, /usr/share/wlanpi-menud/plugins.d/<name>/ or /etc/wlanpi-menud/menu.d/. Every file is validated before any node is registered. The format is deliberately small: ids, labels, parents, order, visibility, parameters and an action that is either a core binding or a handler reference. There are no conditionals, loops, variables or chained calls; once an entry needs those, it is a Python handler. Cross-file rules the schema cannot express (unique ids, parent exists, no cycles, plugin ids under plugin.<name>.*, no collision with built-ins) are enforced by the loader.",
+  "description": "One manifest file in /usr/share/wlanpi-menud/menu.d/, /usr/share/wlanpi-menud/plugins.d/<name>/ or /etc/wlanpi-menud/menu.d/. Every file is validated before any node is registered. The format is deliberately small: ids, labels, parents, order, visibility, parameters and an action that is either a core binding or a handler reference. There are no conditionals, loops, variables or chained calls; once an entry needs those, it is a Python handler. Files in /etc/wlanpi-menud/menu.d/ may add nodes or replace a built-in node by reusing its id; they may not use plugin.* ids. Cross-file rules the schema cannot express (unique ids, parent exists, no cycles, plugin ids under plugin.<name>.*, no collision with built-ins) are enforced by the loader.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -513,6 +513,22 @@
         "view": {
           "$ref": "#/$defs/view_type"
         },
+        "mutates": {
+          "description": "true when the handler changes device state. Decides the default min_role (operator) and rules out sharing and caching. Core bindings derive this from the HTTP method instead.",
+          "type": "boolean",
+          "default": false
+        },
+        "shareable": {
+          "description": "Read handlers only: the result may be shared between sessions or cached under fresh_sec. Never for handlers that return a secret.",
+          "type": "boolean",
+          "default": false
+        },
+        "fresh_sec": {
+          "description": "Cache a shareable handler result for this many seconds.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
+        },
         "timeout_sec": {
           "type": "integer",
           "minimum": 1,
@@ -526,7 +542,55 @@
         "confirm": {
           "$ref": "#/$defs/confirm"
         }
-      }
+      },
+      "allOf": [
+        {
+          "$comment": "Mutations are never shared, deduplicated or cached.",
+          "if": {
+            "required": [
+              "mutates"
+            ],
+            "properties": {
+              "mutates": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "shareable": {
+                "const": false
+              },
+              "fresh_sec": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "$comment": "fresh_sec only makes sense on a shareable read.",
+          "if": {
+            "required": [
+              "fresh_sec"
+            ],
+            "properties": {
+              "fresh_sec": {
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "shareable"
+            ],
+            "properties": {
+              "shareable": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
     },
     "node": {
       "description": "A branch (no action; children name it as their parent) or a leaf (has an action).",

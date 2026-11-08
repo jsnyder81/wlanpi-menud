@@ -144,3 +144,32 @@ failure has a typed code.
 | 4400 | Malformed frame before the handshake |
 | 4401 | Authentication failed or revoked (WebUI logout closes every session with that WebUI session id) |
 | 4426 | No common protocol version |
+
+## Manifest notes (loader behaviour)
+
+- Roots load in order: `menu.d/` built-ins, `plugins.d/<name>/`, then
+  `/etc/wlanpi-menud/menu.d/` overrides. Each file is accepted or rejected
+  whole; a rejected file registers nothing and the rest still load.
+- Overrides may add nodes or replace a built-in node by reusing its id. They
+  may not use `plugin.*` ids, replace plugin nodes, or turn a branch that has
+  children into an action (the override is rejected, the built-in stays).
+- Plugins: `plugin` must equal the directory name, every id is under
+  `plugin.<name>`, ids colliding with anything registered are refused, and
+  `handler` actions are refused (third parties use providers).
+- `handler_action` takes `mutates` (default false), `shareable` and
+  `fresh_sec`, with the same rules as core bindings: a mutating handler is
+  never shared or cached, and `fresh_sec` needs `shareable`. For core
+  bindings the HTTP method decides `mutates`.
+- Besides `requires_core`, a node is hidden when its own core binding's
+  route is not in core's OpenAPI document.
+- Path placeholders must be valid parameter names bound to `path`.
+
+## Not yet in the protocol
+
+- WebUI logout: the plan has the WebUI backend tell wlanpi-menud over
+  `local.sock` to close every session with a WebUI session id. The service
+  implements it (`Service.revoke_webui_session`, close 4401), but there is
+  no frame for it yet; it needs a `revoke` request reserved for the WebUI
+  backend's uid. Decide with the WebUI work (Phase 2).
+- Provider registration and `publish` (Phase 6). Complications already
+  have TTL handling in the service (`Service.publish_complication`).
