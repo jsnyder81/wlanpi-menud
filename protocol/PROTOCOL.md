@@ -140,6 +140,7 @@ failure has a typed code.
 | 1000 | Normal |
 | 1001 | Service stopping; reconnect with backoff (expect a new epoch) |
 | 1008 | Origin check failed (proxy.sock) |
+| 1013 | Session limit reached on that socket; retry later |
 | 4400 | Malformed frame before the handshake |
 | 4401 | Authentication failed or revoked (WebUI logout closes every session with that WebUI session id) |
 | 4426 | No common protocol version |

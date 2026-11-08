@@ -25,6 +25,7 @@
     "1000": "Normal close.",
     "1001": "Service shutting down or restarting; reconnect with backoff. A restart means a new epoch.",
     "1008": "Policy violation: Origin does not match the device's host (proxy.sock only).",
+    "1013": "Try again later: the socket's session limit is reached.",
     "4400": "Malformed frame before the handshake completed (not JSON, not v1 envelope).",
     "4401": "Authentication failed: no auth frame within 10 s on proxy.sock without WebUI headers, invalid or expired token, token in the URL, or the session was revoked (WebUI logout, token revoked). Always preceded by an error frame with code AUTH_FAILED. Do not retry with the same credentials.",
     "4426": "No common protocol version. Preceded by an error frame with code VERSION."
@@ -596,7 +597,7 @@
         "code": { "$ref": "#/$defs/error_code" },
         "message": { "type": "string", "maxLength": 512 },
         "fatal": { "type": "boolean", "default": false },
-        "close_code": { "enum": [1001, 1008, 4400, 4401, 4426] },
+        "close_code": { "enum": [1001, 1008, 1013, 4400, 4401, 4426] },
         "supported": {
           "description": "VERSION only: protocol versions the server speaks.",
           "type": "array",
