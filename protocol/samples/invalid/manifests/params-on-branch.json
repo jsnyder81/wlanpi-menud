@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "x.y",
+      "label": "Y",
+      "parent": "x",
+      "order": 10,
+      "params": [
+        {
+          "name": "n",
+          "label": "N",
+          "type": "integer"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "c14",
+  "job_id": "j5525",
+  "node": "apps.profiler.purge",
+  "state": "error",
+  "error": {
+    "code": "CONFLICT",
+    "message": "Profiler is running; stop it first.",
+    "core_status": 409
+  }
+}

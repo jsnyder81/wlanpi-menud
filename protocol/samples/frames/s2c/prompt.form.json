@@ -1,0 +1,22 @@
+{
+  "v": 1,
+  "type": "prompt",
+  "id": "c13",
+  "prompt_id": "p91c4",
+  "node": "system.reg_domain.set",
+  "kind": "form",
+  "title": "Set Domain",
+  "fields": [
+    {
+      "name": "country",
+      "label": "Country",
+      "type": "enum",
+      "choices": [
+        {
+          "value": "US",
+          "label": "US"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "x.y",
+      "label": "Y",
+      "parent": "x",
+      "order": 10,
+      "action": {
+        "core": "POST /system/reg-domain/set",
+        "bind": {
+          "country": "body"
+        }
+      },
+      "params": [
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "enum"
+        }
+      ]
+    }
+  ]
+}

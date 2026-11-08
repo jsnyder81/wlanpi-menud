@@ -1,0 +1,35 @@
+{
+  "v": 1,
+  "type": "hello",
+  "id": "c2",
+  "mode": "rich",
+  "protocol": [
+    1
+  ],
+  "client": {
+    "name": "wlanpi-webui",
+    "version": "3.2.0"
+  },
+  "capabilities": {
+    "blocks": [
+      "text",
+      "kv",
+      "table",
+      "list",
+      "qr",
+      "status",
+      "progress",
+      "confirm"
+    ],
+    "colour": "colour"
+  },
+  "resume": {
+    "epoch": "k3Jd9QpA2mVx",
+    "session_id": "s-7f2a",
+    "seq": {
+      "device.summary": 41,
+      "complications": 7
+    },
+    "menu_revision": 3
+  }
+}

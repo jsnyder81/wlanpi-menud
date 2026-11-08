@@ -1,0 +1,757 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wlanpi.com/schemas/wlanpi-menud/frames.schema.json",
+  "title": "wlanpi-menud WebSocket frame, protocol v1",
+  "description": "Every frame on /run/wlanpi-menud/local.sock and /run/wlanpi-menud/proxy.sock (/ui/ws through nginx) is one JSON text message of the form {\"v\":1, \"type\":..., \"id\":..., ...}. A reply to a request carries the request's id. A frame the server sends unprompted carries a server id starting with 's:'. Ordering, auth, reconnect and mode rules that a schema cannot express are written out in protocol/PROTOCOL.md and repeated in each $def description.",
+  "oneOf": [
+    { "$ref": "#/$defs/auth" },
+    { "$ref": "#/$defs/hello" },
+    { "$ref": "#/$defs/subscribe" },
+    { "$ref": "#/$defs/unsubscribe" },
+    { "$ref": "#/$defs/input" },
+    { "$ref": "#/$defs/invoke" },
+    { "$ref": "#/$defs/answer" },
+    { "$ref": "#/$defs/page" },
+    { "$ref": "#/$defs/cancel" },
+    { "$ref": "#/$defs/welcome" },
+    { "$ref": "#/$defs/menu" },
+    { "$ref": "#/$defs/view" },
+    { "$ref": "#/$defs/prompt" },
+    { "$ref": "#/$defs/job" },
+    { "$ref": "#/$defs/event" },
+    { "$ref": "#/$defs/error" }
+  ],
+  "x-close-codes": {
+    "1000": "Normal close.",
+    "1001": "Service shutting down or restarting; reconnect with backoff. A restart means a new epoch.",
+    "1008": "Policy violation: Origin does not match the device's host (proxy.sock only).",
+    "4400": "Malformed frame before the handshake completed (not JSON, not v1 envelope).",
+    "4401": "Authentication failed: no auth frame within 10 s on proxy.sock without WebUI headers, invalid or expired token, token in the URL, or the session was revoked (WebUI logout, token revoked). Always preceded by an error frame with code AUTH_FAILED. Do not retry with the same credentials.",
+    "4426": "No common protocol version. Preceded by an error frame with code VERSION."
+  },
+  "$defs": {
+    "msg_id": {
+      "description": "Client message id (opaque, unique per connection), echoed on the reply. Server-initiated frames use ids beginning with 's:'.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9:_\\-.]+$"
+    },
+    "node_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+      "maxLength": 128
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^j[A-Za-z0-9_\\-]{3,63}$"
+    },
+    "prompt_id": {
+      "type": "string",
+      "pattern": "^p[A-Za-z0-9_\\-]{3,63}$"
+    },
+    "epoch": {
+      "description": "Chosen at random each time the service starts. A different epoch means the service restarted and nothing the client holds is current.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_\\-]{8,64}$"
+    },
+    "topic": {
+      "description": "Subscription topic, for example device.summary, complications, alerts, jobs. A trailing .* subscribes to a family.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*(\\.\\*)?$",
+      "maxLength": 128
+    },
+    "role": { "enum": ["viewer", "operator", "admin", "provider"] },
+    "envelope": {
+      "type": "object",
+      "required": ["v", "type", "id"],
+      "properties": {
+        "v": { "const": 1 },
+        "type": { "type": "string" },
+        "id": { "$ref": "#/$defs/msg_id" }
+      }
+    },
+    "param_value": {
+      "description": "A parameter value. Adapter parameters take {iface, namespace}.",
+      "oneOf": [
+        { "type": ["string", "integer", "boolean"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["iface"],
+          "properties": {
+            "iface": { "type": "string", "pattern": "^[A-Za-z0-9_.\\-]{1,15}$" },
+            "namespace": { "type": ["string", "null"] }
+          }
+        }
+      ]
+    },
+
+    "auth": {
+      "description": "C to S. Must be the first frame on proxy.sock when nginx did not attach WebUI session headers, and must arrive within 10 s. Never sent on local.sock (kernel peer credentials are used) or by pre-authenticated WebUI sessions. ?token= in the URL is refused. Success: the server sends welcome after hello. Failure: error AUTH_FAILED, then close 4401.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "token"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "auth" },
+        "token": {
+          "description": "A wlanpi-core JWT. Validated with core's introspection endpoint; the result is cached for at most 60 s or until exp.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+\\.[A-Za-z0-9_\\-]+$",
+          "maxLength": 8192
+        }
+      }
+    },
+    "hello": {
+      "description": "C to S. First frame on local.sock and on pre-authenticated proxy.sock sessions; second frame after auth otherwise. Any other frame before hello is answered with error VERSION (fatal). Declares the client mode (thin or rich), what it can render, the protocol versions it speaks and, when reconnecting, the epoch and per-topic sequence numbers it last saw.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "mode", "protocol"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "hello" },
+        "mode": {
+          "description": "thin: the server holds the nav cursor and pushes view frames; the client sends input. rich: the client navigates the menu tree locally and sends invoke; the server sends no view frames.",
+          "enum": ["thin", "rich"]
+        },
+        "protocol": {
+          "description": "Protocol versions the client speaks. The server picks the highest common one, or replies error VERSION and closes 4426.",
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1 },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "client": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "maxLength": 64 },
+            "version": { "type": "string", "maxLength": 32 }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "screen": {
+              "description": "Usable area. Thin clients use it so the server can page lists to fit (the panel is 128x128 pixels, about 8 rows of 16 characters).",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "width_px": { "type": "integer", "minimum": 1 },
+                "height_px": { "type": "integer", "minimum": 1 },
+                "cols": { "type": "integer", "minimum": 1 },
+                "rows": { "type": "integer", "minimum": 1 }
+              }
+            },
+            "colour": { "enum": ["mono", "grey", "colour"] },
+            "blocks": {
+              "description": "Block types the client renders natively. Anything else it renders from the block's text fallback. text is always supported.",
+              "type": "array",
+              "items": { "$ref": "#/$defs/block_type" },
+              "uniqueItems": true
+            },
+            "keys": {
+              "description": "Thin mode: input keys the device has.",
+              "type": "array",
+              "items": { "$ref": "#/$defs/key" },
+              "uniqueItems": true
+            }
+          }
+        },
+        "resume": {
+          "description": "Reconnect state. If epoch equals the server's current epoch and every listed topic's seq equals the server's latest seq for that topic, the session continues (welcome.resumed=true) and the client's jobs stay attached. Otherwise the server sends a full snapshot: menu, one event with snapshot=true per subscribed topic, and a job frame for each of the session's live jobs. There is no replay buffer.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["epoch"],
+          "properties": {
+            "epoch": { "$ref": "#/$defs/epoch" },
+            "session_id": { "type": "string", "maxLength": 64 },
+            "seq": {
+              "type": "object",
+              "propertyNames": { "$ref": "#/$defs/topic" },
+              "additionalProperties": { "type": "integer", "minimum": 0 }
+            },
+            "menu_revision": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "subscribe": {
+      "description": "C to S. Start receiving event frames for topics. The server replies with one event snapshot (snapshot=true) per newly subscribed topic, each carrying the request id.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "topics"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "subscribe" },
+        "topics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topic" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "unsubscribe": {
+      "description": "C to S. Stop receiving event frames for topics. No reply on success.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "topics"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "unsubscribe" },
+        "topics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/topic" },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "key": { "enum": ["up", "down", "left", "right", "center", "key1", "key2", "key3"] },
+    "input": {
+      "description": "C to S, thin mode only (a rich session sending input gets error BAD_REQUEST). A button event against this session's own cursor; other sessions are unaffected. The server answers with a view frame carrying the request id (or a prompt frame when the input opened one).",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "key"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "input" },
+        "key": { "$ref": "#/$defs/key" },
+        "action": { "enum": ["press", "hold"], "default": "press" }
+      }
+    },
+    "invoke": {
+      "description": "C to S. Run a node's action. Used by rich clients, and by thin clients for shortcuts. The reply is a job frame with state queued (or a shared running job) carrying the request id and the job_id. Missing parameters are asked for with prompt frames. FORBIDDEN if the node is hidden for this session or the role is too low.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "node"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "invoke" },
+        "node": { "$ref": "#/$defs/node_id" },
+        "params": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_]*$" },
+          "additionalProperties": { "$ref": "#/$defs/param_value" }
+        },
+        "confirmed": {
+          "description": "Rich clients that already showed the node's confirm text may set this to skip the server's confirm prompt.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "answer": {
+      "description": "C to S. Reply to a prompt. Only the session and principal the prompt was sent to may answer it; anyone else gets FORBIDDEN. Exactly one of value, values, confirmed or cancel.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "prompt_id"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "answer" },
+        "prompt_id": { "$ref": "#/$defs/prompt_id" },
+        "value": { "$ref": "#/$defs/param_value" },
+        "values": {
+          "description": "Answers to a form prompt, by field name.",
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/param_value" }
+        },
+        "confirmed": { "type": "boolean" },
+        "cancel": { "const": true }
+      },
+      "oneOf": [
+        { "required": ["value"] },
+        { "required": ["values"] },
+        { "required": ["confirmed"] },
+        { "required": ["cancel"] }
+      ]
+    },
+    "page": {
+      "description": "C to S. Fetch another page of a large result by cursor. Thin clients normally page with up and down; the server fetches on demand. Reply: a job frame (state result) with the page, carrying the request id.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "job_id", "cursor"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "page" },
+        "job_id": { "$ref": "#/$defs/job_id" },
+        "cursor": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "cancel": {
+      "description": "C to S. Detach this session from a job. The job stops only when no session is still attached and the action is cancellable. Reply: job frame with state cancelled for this session.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "job_id"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "cancel" },
+        "job_id": { "$ref": "#/$defs/job_id" }
+      }
+    },
+
+    "welcome": {
+      "description": "S to C. Reply to hello. After welcome the server sends menu (unless resumed with an unchanged menu revision) and, in thin mode, the current view.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "session_id", "epoch", "principal", "roles", "version", "mode", "resumed"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "welcome" },
+        "session_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "epoch": { "$ref": "#/$defs/epoch" },
+        "version": { "description": "Negotiated protocol version.", "type": "integer", "minimum": 1 },
+        "mode": { "enum": ["thin", "rich"] },
+        "resumed": {
+          "description": "true: same epoch and unbroken sequence, the session continues. false: a full snapshot follows.",
+          "type": "boolean"
+        },
+        "principal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": {
+              "description": "local: SO_PEERCRED on local.sock. webui: nginx auth_request headers on proxy.sock. jwt: core JWT in the first frame on proxy.sock.",
+              "enum": ["local", "webui", "jwt"]
+            },
+            "name": { "type": "string", "maxLength": 128 },
+            "uid": { "type": "integer", "minimum": 0 },
+            "did": { "description": "Core device id the session acts as in core.", "type": "string", "maxLength": 128 }
+          }
+        },
+        "roles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/role" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "queue_frames": { "description": "Outbound queue bound for this client.", "type": "integer", "minimum": 1 },
+            "max_frame_bytes": { "type": "integer", "minimum": 1024 }
+          }
+        }
+      }
+    },
+    "menu_node": {
+      "description": "A node as resolved for this session: hidden nodes are already removed; core bindings and handler names are not exposed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "parent", "order", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/node_id" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "parent": { "oneOf": [{ "$ref": "#/$defs/node_id" }, { "type": "null" }] },
+        "order": { "type": "integer" },
+        "kind": { "enum": ["branch", "action"] },
+        "params": {
+          "description": "Same shape as the manifest's params.",
+          "type": "array",
+          "items": { "type": "object", "required": ["name", "label", "type"] }
+        },
+        "confirm": {
+          "type": "object",
+          "required": ["message"],
+          "properties": {
+            "title": { "type": "string" },
+            "message": { "type": "string" },
+            "confirm_label": { "type": "string" },
+            "cancel_label": { "type": "string" }
+          }
+        },
+        "view": { "$ref": "#/$defs/block_type" },
+        "cancellable": { "type": "boolean" },
+        "mutates": { "type": "boolean" },
+        "provider": { "description": "Set for nodes registered by an out-of-process provider.", "type": "string" }
+      }
+    },
+    "menu": {
+      "description": "S to C. The full tree visible to this session, on connect and whenever it changes (mode switch, plugin install, provider connect or disconnect, role change). Always a full replacement, never a diff.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "revision", "nodes"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "menu" },
+        "revision": { "type": "integer", "minimum": 0 },
+        "device_mode": { "type": "string" },
+        "nodes": { "type": "array", "items": { "$ref": "#/$defs/menu_node" } }
+      }
+    },
+    "view": {
+      "description": "S to C, thin mode only. The session's current screen as view blocks: a menu list (a list block with selected), a result, a prompt or the home page. Sent after every input and whenever the shown data changes.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "screen", "blocks"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "view" },
+        "screen": { "enum": ["home", "menu", "result", "prompt", "busy", "unavailable"] },
+        "node": { "oneOf": [{ "$ref": "#/$defs/node_id" }, { "type": "null" }] },
+        "title": { "type": "string", "maxLength": 64 },
+        "breadcrumb": { "type": "array", "items": { "type": "string" } },
+        "blocks": { "type": "array", "items": { "$ref": "#/$defs/block" } },
+        "job_id": { "$ref": "#/$defs/job_id" },
+        "page": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "index": { "type": "integer", "minimum": 0 },
+            "count": { "type": "integer", "minimum": 1 },
+            "more": { "type": "boolean" }
+          }
+        },
+        "hints": {
+          "description": "Key legend, for example {\"left\":\"Back\",\"center\":\"Run\"}.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/key" },
+          "additionalProperties": { "type": "string", "maxLength": 16 }
+        }
+      }
+    },
+    "prompt": {
+      "description": "S to C. Ask the session to pick, confirm or fill a form: a node's parameter, a node's confirm text, or mid-job (for example core returned needsSelection on a scan and the server lists core's candidates). Bound to this session and principal. Thin clients get one prompt per parameter.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "prompt_id", "kind", "title"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "prompt" },
+        "prompt_id": { "$ref": "#/$defs/prompt_id" },
+        "job_id": { "$ref": "#/$defs/job_id" },
+        "node": { "$ref": "#/$defs/node_id" },
+        "kind": { "enum": ["select", "confirm", "integer", "string", "form"] },
+        "title": { "type": "string", "maxLength": 64 },
+        "message": { "type": "string", "maxLength": 256 },
+        "options": {
+          "description": "select only.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "$ref": "#/$defs/param_value" },
+              "label": { "type": "string", "maxLength": 64 },
+              "detail": { "type": "string", "maxLength": 64 }
+            }
+          }
+        },
+        "fields": {
+          "description": "form only: manifest parameter definitions.",
+          "type": "array",
+          "items": { "type": "object", "required": ["name", "label", "type"] }
+        },
+        "confirm_label": { "type": "string", "maxLength": 16 },
+        "cancel_label": { "type": "string", "maxLength": 16 },
+        "minimum": { "type": "integer" },
+        "maximum": { "type": "integer" },
+        "default": { "$ref": "#/$defs/param_value" },
+        "expires_sec": { "type": "integer", "minimum": 1 }
+      },
+      "anyOf": [
+        { "properties": { "kind": { "not": { "enum": ["select", "form"] } } } },
+        { "properties": { "kind": { "const": "select" } }, "required": ["options"] },
+        { "properties": { "kind": { "const": "form" } }, "required": ["fields"] }
+      ]
+    },
+    "job": {
+      "description": "S to C. Job lifecycle: queued, progress, result (first page plus cursor), error, cancelled. Sent to every attached session. A shareable read already running or fresh within fresh_sec is attached to rather than re-run (shared=true). Mutations are never shared.",
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        { "if": { "properties": { "state": { "const": "result" } } }, "then": { "required": ["result"] } },
+        { "if": { "properties": { "state": { "const": "error" } } }, "then": { "required": ["error"] } },
+        { "if": { "properties": { "state": { "const": "progress" } } }, "then": { "required": ["progress"] } }
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "job_id", "node", "state"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "job" },
+        "job_id": { "$ref": "#/$defs/job_id" },
+        "node": { "$ref": "#/$defs/node_id" },
+        "state": { "enum": ["queued", "progress", "result", "error", "cancelled"] },
+        "shared": { "type": "boolean", "default": false },
+        "cached_at": { "type": "string", "format": "date-time" },
+        "progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+            "message": { "type": "string", "maxLength": 128 }
+          }
+        },
+        "result": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["blocks"],
+          "properties": {
+            "title": { "type": "string", "maxLength": 64 },
+            "blocks": { "type": "array", "items": { "$ref": "#/$defs/block" } },
+            "cursor": {
+              "description": "Opaque cursor for the next page; null or absent on the last page.",
+              "type": ["string", "null"],
+              "maxLength": 256
+            },
+            "total": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message"],
+          "properties": {
+            "code": { "$ref": "#/$defs/error_code" },
+            "message": { "type": "string", "maxLength": 512 },
+            "core_status": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "event": {
+      "description": "S to C. Topic data. seq starts at 1 per topic per epoch and increases by one per change the server publishes; the server publishes only on change. snapshot=true marks a full value (after subscribe, after a resync, or after this client's outbound queue overflowed and drained). When a client's bounded queue fills, its queued topic updates are dropped and it gets a snapshot once it drains; a gap in seq without snapshot=true means the client must treat its state as stale until the next snapshot.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "topic", "seq", "data"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "event" },
+        "topic": { "$ref": "#/$defs/topic" },
+        "seq": { "type": "integer", "minimum": 1 },
+        "snapshot": { "type": "boolean", "default": false },
+        "data": {}
+      }
+    },
+    "error_code": {
+      "description": "AUTH_FAILED: bad, missing, expired or revoked credentials (always fatal, close 4401). FORBIDDEN: the session's role or visibility does not allow this node, or the prompt belongs to another session. CONFLICT: core answered 409; message is core's. VERSION: no common protocol version, or a frame before hello (fatal, close 4426). BAD_REQUEST: frame failed schema validation or is not valid in this mode. NOT_FOUND: unknown node, job, prompt or cursor. CORE_UNAVAILABLE: core unreachable or returned 5xx (including AUTH_CLOCK_NOT_SET after the service's own re-mint failed). TIMEOUT: the action exceeded its timeout. INTERNAL: anything else.",
+      "enum": ["AUTH_FAILED", "FORBIDDEN", "CONFLICT", "VERSION", "BAD_REQUEST", "NOT_FOUND", "CORE_UNAVAILABLE", "TIMEOUT", "INTERNAL"]
+    },
+    "error": {
+      "description": "S to C. A request failed, or the connection is about to close. id is the failing request's id when there is one. When fatal is true the server closes the socket with close_code right after this frame.",
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "if": { "properties": { "code": { "const": "AUTH_FAILED" } } },
+          "then": {
+            "required": ["fatal", "close_code"],
+            "properties": { "fatal": { "const": true }, "close_code": { "const": 4401 } }
+          }
+        },
+        {
+          "if": { "properties": { "code": { "const": "VERSION" } } },
+          "then": {
+            "required": ["fatal", "close_code"],
+            "properties": { "fatal": { "const": true }, "close_code": { "const": 4426 } }
+          }
+        },
+        {
+          "if": { "required": ["fatal"], "properties": { "fatal": { "const": true } } },
+          "then": { "required": ["close_code"] }
+        }
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "code", "message"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "error" },
+        "code": { "$ref": "#/$defs/error_code" },
+        "message": { "type": "string", "maxLength": 512 },
+        "fatal": { "type": "boolean", "default": false },
+        "close_code": { "enum": [1001, 1008, 4400, 4401, 4426] },
+        "supported": {
+          "description": "VERSION only: protocol versions the server speaks.",
+          "type": "array",
+          "items": { "type": "integer" }
+        },
+        "core_status": { "description": "HTTP status from core, when the error came from core.", "type": "integer" },
+        "retry_after_sec": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "block_type": { "enum": ["text", "kv", "table", "list", "qr", "status", "progress", "confirm"] },
+    "block": {
+      "description": "Render-neutral result block. Every block carries text: a plain-text rendering a surface uses when it does not support the block type. Surfaces must render text blocks.",
+      "oneOf": [
+        { "$ref": "#/$defs/block_text" },
+        { "$ref": "#/$defs/block_kv" },
+        { "$ref": "#/$defs/block_table" },
+        { "$ref": "#/$defs/block_list" },
+        { "$ref": "#/$defs/block_qr" },
+        { "$ref": "#/$defs/block_status" },
+        { "$ref": "#/$defs/block_progress" },
+        { "$ref": "#/$defs/block_confirm" }
+      ]
+    },
+    "fallback": { "type": "string", "maxLength": 16384 },
+    "block_text": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "text" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "style": { "enum": ["body", "heading", "mono", "muted"], "default": "body" }
+      }
+    },
+    "block_kv": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "items"],
+      "properties": {
+        "type": { "const": "kv" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "value"],
+            "properties": {
+              "key": { "type": "string", "maxLength": 64 },
+              "value": { "type": ["string", "number", "boolean", "null"] },
+              "secret": { "description": "Surfaces may mask until revealed.", "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "block_table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "columns", "rows"],
+      "properties": {
+        "type": { "const": "table" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "label"],
+            "properties": {
+              "key": { "type": "string" },
+              "label": { "type": "string", "maxLength": 32 },
+              "align": { "enum": ["left", "right"] },
+              "priority": { "description": "Lower is kept first when a narrow surface drops columns.", "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": { "type": "array", "items": { "type": ["string", "number", "boolean", "null"] } }
+        }
+      }
+    },
+    "block_list": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "items"],
+      "properties": {
+        "type": { "const": "list" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label"],
+            "properties": {
+              "label": { "type": "string", "maxLength": 64 },
+              "detail": { "type": "string", "maxLength": 64 },
+              "node": { "$ref": "#/$defs/node_id" },
+              "branch": { "type": "boolean" }
+            }
+          }
+        },
+        "selected": { "description": "Thin mode: the cursor index.", "type": "integer", "minimum": 0 }
+      }
+    },
+    "block_qr": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "data"],
+      "properties": {
+        "type": { "const": "qr" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "data": { "type": "string", "maxLength": 2048 },
+        "caption": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "block_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "level"],
+      "properties": {
+        "type": { "const": "status" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "level": { "enum": ["ok", "info", "warn", "error"] },
+        "label": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "block_progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "progress" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "pct": { "description": "null for indeterminate.", "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "label": { "type": "string", "maxLength": 64 }
+      }
+    },
+    "block_confirm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text", "prompt_id", "message"],
+      "properties": {
+        "type": { "const": "confirm" },
+        "text": { "$ref": "#/$defs/fallback" },
+        "prompt_id": { "$ref": "#/$defs/prompt_id" },
+        "message": { "type": "string", "maxLength": 256 },
+        "confirm_label": { "type": "string", "maxLength": 16, "default": "Confirm" },
+        "cancel_label": { "type": "string", "maxLength": 16, "default": "Cancel" },
+        "selected": { "enum": ["confirm", "cancel"], "default": "cancel" }
+      }
+    }
+  }
+}

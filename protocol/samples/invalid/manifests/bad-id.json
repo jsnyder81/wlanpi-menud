@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "Network.LLDP",
+      "label": "L",
+      "parent": null,
+      "order": 1
+    }
+  ]
+}

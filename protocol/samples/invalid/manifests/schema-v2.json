@@ -1,0 +1,11 @@
+{
+  "schema": 2,
+  "nodes": [
+    {
+      "id": "x",
+      "label": "X",
+      "parent": null,
+      "order": 1
+    }
+  ]
+}

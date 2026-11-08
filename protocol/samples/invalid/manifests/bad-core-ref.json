@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "x.y",
+      "label": "Y",
+      "parent": "x",
+      "order": 10,
+      "action": {
+        "core": "/system/device/info"
+      }
+    }
+  ]
+}

@@ -1,0 +1,596 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wlanpi.com/schemas/wlanpi-menud/menu.schema.json",
+  "title": "wlanpi-menud menu manifest",
+  "description": "One manifest file in /usr/share/wlanpi-menud/menu.d/, /usr/share/wlanpi-menud/plugins.d/<name>/ or /etc/wlanpi-menud/menu.d/. Every file is validated before any node is registered. The format is deliberately small: ids, labels, parents, order, visibility, parameters and an action that is either a core binding or a handler reference. There are no conditionals, loops, variables or chained calls; once an entry needs those, it is a Python handler. Cross-file rules the schema cannot express (unique ids, parent exists, no cycles, plugin ids under plugin.<name>.*, no collision with built-ins) are enforced by the loader.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "nodes"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Optional editor hint; ignored by the loader.",
+      "type": "string"
+    },
+    "schema": {
+      "description": "Manifest format version. Only 1 exists.",
+      "const": 1
+    },
+    "plugin": {
+      "description": "Plugin name for files under plugins.d/<name>/. When set, every node id must start with plugin.<name>. (checked by the loader). Omitted for built-in and local override files.",
+      "$ref": "#/$defs/segment"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    }
+  },
+  "$defs": {
+    "segment": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "maxLength": 32
+    },
+    "node_id": {
+      "description": "Stable dotted id. The PoC's ids (for example network.lldp) carry over. Ids are part of the public contract: rich clients, shortcuts and plugins reference them.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+      "maxLength": 128
+    },
+    "core_ref": {
+      "description": "A core route as 'METHOD /path', relative to /api/v1. Path segments in braces are filled from parameters bound to 'path'.",
+      "type": "string",
+      "pattern": "^(GET|POST|PUT|PATCH|DELETE) /[A-Za-z0-9_\\-./{}]*$"
+    },
+    "role": {
+      "description": "wlanpi-menud roles decide what a session sees and may run. They are not a security boundary (core tokens carry no scope).",
+      "enum": [
+        "viewer",
+        "operator",
+        "admin"
+      ]
+    },
+    "device_mode": {
+      "description": "Device mode as core reports it from /etc/wlanpi-state.",
+      "enum": [
+        "classic",
+        "hotspot",
+        "server",
+        "bridge",
+        "wiperf",
+        "wconsole"
+      ]
+    },
+    "capability": {
+      "description": "Hardware or platform capability the service derives from core (model, /system/device/info, /wifi/capabilities, battery presence). 'transmit' is false on the Go and on unknown models, matching core's transmit policy (hostapd, wpa_supplicant, Bluetooth refused).",
+      "enum": [
+        "transmit",
+        "bluetooth",
+        "battery",
+        "monitor_adapter",
+        "multiple_adapters",
+        "ethernet",
+        "display",
+        "gpio_buttons"
+      ]
+    },
+    "visibility": {
+      "description": "All present rules must hold for the node to be shown and runnable. Hidden nodes are omitted from the menu frame and refused on invoke (FORBIDDEN). A hidden branch hides its subtree.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "modes": {
+          "description": "Show only in these device modes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/device_mode"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "not_modes": {
+          "description": "Hide in these device modes.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/device_mode"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "capabilities": {
+          "description": "Every listed capability must be present.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "min_role": {
+          "description": "Lowest role that sees the node. Default: viewer for reads, operator for mutations (decided by the loader from the action).",
+          "$ref": "#/$defs/role"
+        },
+        "requires_core": {
+          "description": "Core routes that must exist in the connected core's OpenAPI document. A node whose endpoint is missing is hidden, which lets the service and TUI ship before core parity.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/core_ref"
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/core_ref"
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          ]
+        }
+      }
+    },
+    "param": {
+      "description": "Rich clients render a form; thin clients get one prompt per parameter, in order.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/param_enum"
+        },
+        {
+          "$ref": "#/$defs/param_integer"
+        },
+        {
+          "$ref": "#/$defs/param_string"
+        },
+        {
+          "$ref": "#/$defs/param_adapter"
+        }
+      ]
+    },
+    "param_enum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "type",
+        "choices"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/segment"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "type": {
+          "const": "enum"
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "label"
+            ],
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32
+              }
+            }
+          }
+        },
+        "default": {
+          "type": [
+            "string",
+            "integer",
+            "boolean"
+          ]
+        }
+      }
+    },
+    "param_integer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/segment"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "type": {
+          "const": "integer"
+        },
+        "minimum": {
+          "type": "integer"
+        },
+        "maximum": {
+          "type": "integer"
+        },
+        "step": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "default": {
+          "type": "integer"
+        }
+      }
+    },
+    "param_string": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/segment"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "type": {
+          "const": "string"
+        },
+        "pattern": {
+          "type": "string",
+          "format": "regex"
+        },
+        "min_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "secret": {
+          "description": "Never echoed in views, logs or job sharing. A node with a secret parameter is never shareable.",
+          "type": "boolean",
+          "default": false
+        },
+        "default": {
+          "type": "string"
+        }
+      }
+    },
+    "param_adapter": {
+      "description": "A Wi-Fi or Ethernet adapter. The value is {iface, namespace}; bound to 'query' it expands to the iface and namespace query parameters core's namespace-aware routes take. Choices come from core's /network/config/status at prompt time.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/segment"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "type": {
+          "const": "adapter"
+        },
+        "kind": {
+          "enum": [
+            "wlan",
+            "ethernet",
+            "any"
+          ],
+          "default": "wlan"
+        },
+        "monitor": {
+          "description": "Offer only adapters that can scan or capture in monitor mode.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "confirm": {
+      "description": "Ask before running. The confirmation is bound to the invoking session and principal.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "confirm_label": {
+          "type": "string",
+          "maxLength": 16,
+          "default": "Confirm"
+        },
+        "cancel_label": {
+          "type": "string",
+          "maxLength": 16,
+          "default": "Cancel"
+        }
+      }
+    },
+    "view_type": {
+      "description": "Preferred block type for rendering the result.",
+      "enum": [
+        "text",
+        "kv",
+        "table",
+        "list",
+        "qr",
+        "status",
+        "progress"
+      ]
+    },
+    "core_action": {
+      "description": "Declarative binding: call one core endpoint and show the result.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "core"
+      ],
+      "properties": {
+        "core": {
+          "$ref": "#/$defs/core_ref"
+        },
+        "bind": {
+          "description": "Where each declared parameter goes in the core request.",
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/segment"
+          },
+          "additionalProperties": {
+            "enum": [
+              "path",
+              "query",
+              "body"
+            ]
+          }
+        },
+        "query": {
+          "description": "Constant query parameters.",
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "integer",
+              "boolean"
+            ]
+          }
+        },
+        "body": {
+          "description": "Constant JSON body fields; bound 'body' parameters are merged on top.",
+          "type": "object"
+        },
+        "select": {
+          "description": "JSON Pointer (RFC 6901) into core's response; only that part is rendered. A projection, not a variable: for example /lldp_neighbour_info out of GET /network/info/.",
+          "type": "string",
+          "pattern": "^(/[^/]*)*$"
+        },
+        "view": {
+          "$ref": "#/$defs/view_type"
+        },
+        "shareable": {
+          "description": "Only reads may be shared between sessions or cached. Anything returning a secret (SSID passphrase, PSKs) is never shareable.",
+          "type": "boolean",
+          "default": false
+        },
+        "fresh_sec": {
+          "description": "Cache a shareable result for this many seconds.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "timeout_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 30
+        },
+        "cancellable": {
+          "type": "boolean",
+          "default": false
+        },
+        "confirm": {
+          "$ref": "#/$defs/confirm"
+        }
+      },
+      "allOf": [
+        {
+          "$comment": "Mutations are never shared, deduplicated or cached.",
+          "if": {
+            "properties": {
+              "core": {
+                "pattern": "^(POST|PUT|PATCH|DELETE) "
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "shareable": {
+                "const": false
+              },
+              "fresh_sec": {
+                "const": 0
+              }
+            }
+          }
+        },
+        {
+          "$comment": "fresh_sec only makes sense on a shareable read.",
+          "if": {
+            "required": [
+              "fresh_sec"
+            ],
+            "properties": {
+              "fresh_sec": {
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "shareable"
+            ],
+            "properties": {
+              "shareable": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "handler_action": {
+      "description": "Python handler inside the wlanpi-menud tree, for multi-step flows or composed views (for example network.adapter_summary). Third parties use providers instead.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handler"
+      ],
+      "properties": {
+        "handler": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$",
+          "maxLength": 128
+        },
+        "view": {
+          "$ref": "#/$defs/view_type"
+        },
+        "timeout_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "default": 30
+        },
+        "cancellable": {
+          "type": "boolean",
+          "default": false
+        },
+        "confirm": {
+          "$ref": "#/$defs/confirm"
+        }
+      }
+    },
+    "node": {
+      "description": "A branch (no action; children name it as their parent) or a leaf (has an action).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "parent",
+        "order"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/node_id"
+        },
+        "label": {
+          "description": "Shown on every surface. Keep it short: the panel fits about 16 characters.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "parent": {
+          "description": "Parent node id, or null for a top-level entry.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/node_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "order": {
+          "description": "Sort key among siblings; ties sort by id. Leave gaps (10, 20, ...) so plugins can slot in.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "visibility": {
+          "$ref": "#/$defs/visibility"
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/param"
+          },
+          "maxItems": 8
+        },
+        "action": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/core_action"
+            },
+            {
+              "$ref": "#/$defs/handler_action"
+            }
+          ]
+        }
+      },
+      "dependentRequired": {
+        "params": [
+          "action"
+        ]
+      }
+    }
+  }
+}

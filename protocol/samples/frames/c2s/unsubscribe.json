@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "unsubscribe",
+  "id": "c9",
+  "topics": [
+    "alerts"
+  ]
+}

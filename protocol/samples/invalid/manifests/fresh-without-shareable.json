@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "x.y",
+      "label": "Y",
+      "parent": "x",
+      "order": 10,
+      "action": {
+        "core": "GET /system/device/info",
+        "fresh_sec": 60
+      }
+    }
+  ]
+}

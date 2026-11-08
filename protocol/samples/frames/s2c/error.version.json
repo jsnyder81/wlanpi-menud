@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "error",
+  "id": "c1",
+  "code": "VERSION",
+  "message": "No common protocol version",
+  "fatal": true,
+  "close_code": 4426,
+  "supported": [
+    1
+  ]
+}

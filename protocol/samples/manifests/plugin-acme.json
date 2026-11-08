@@ -1,0 +1,71 @@
+{
+  "$schema": "../../menu.schema.json",
+  "schema": 1,
+  "plugin": "acme",
+  "nodes": [
+    {
+      "id": "plugin.acme",
+      "label": "Acme Tools",
+      "parent": "utils",
+      "order": 900,
+      "visibility": {
+        "min_role": "operator"
+      }
+    },
+    {
+      "id": "plugin.acme.dhcp_leases",
+      "label": "DHCP Leases",
+      "parent": "plugin.acme",
+      "order": 10,
+      "action": {
+        "core": "GET /network/dhcp/leases",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 15
+      }
+    },
+    {
+      "id": "plugin.acme.ping",
+      "label": "Ping Target",
+      "parent": "plugin.acme",
+      "order": 20,
+      "params": [
+        {
+          "name": "targets",
+          "label": "Host",
+          "type": "string",
+          "max_length": 253,
+          "pattern": "^[A-Za-z0-9.:\\-]+$"
+        }
+      ],
+      "action": {
+        "core": "GET /utils/reachability",
+        "bind": {
+          "targets": "query"
+        },
+        "view": "kv",
+        "timeout_sec": 60
+      }
+    },
+    {
+      "id": "plugin.acme.restart_iperf3",
+      "label": "Restart iperf3",
+      "parent": "plugin.acme",
+      "order": 30,
+      "visibility": {
+        "min_role": "admin",
+        "requires_core": "POST /system/service/restart"
+      },
+      "action": {
+        "core": "POST /system/service/restart",
+        "query": {
+          "name": "iperf3"
+        },
+        "view": "status",
+        "confirm": {
+          "message": "Restart the iperf3 server?"
+        }
+      }
+    }
+  ]
+}

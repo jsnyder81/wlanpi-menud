@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "answer",
+  "id": "c7",
+  "prompt_id": "p91c2",
+  "value": {
+    "iface": "wlan0",
+    "namespace": "ns_wlan0"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "s:6",
+  "job_id": "j5524",
+  "node": "apps.profiler.status",
+  "state": "result",
+  "result": {
+    "blocks": [
+      {
+        "type": "text",
+        "style": "heading",
+        "text": "Profiler running"
+      },
+      {
+        "type": "qr",
+        "data": "WIFI:S:WLAN Pi;T:WPA;P:example-passphrase;;",
+        "caption": "Join profiler",
+        "text": "SSID: WLAN Pi"
+      },
+      {
+        "type": "progress",
+        "pct": 40,
+        "label": "Capturing",
+        "text": "Capturing 40%"
+      },
+      {
+        "type": "confirm",
+        "prompt_id": "p91c5",
+        "message": "Stop the profiler?",
+        "text": "Stop the profiler? [Confirm] [Cancel]"
+      }
+    ],
+    "cursor": null
+  }
+}

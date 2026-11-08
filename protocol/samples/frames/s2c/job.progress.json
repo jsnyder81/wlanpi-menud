@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "s:4",
+  "job_id": "j5523",
+  "node": "utils.speedtest.run",
+  "state": "progress",
+  "progress": {
+    "pct": null,
+    "message": "Testing download"
+  }
+}

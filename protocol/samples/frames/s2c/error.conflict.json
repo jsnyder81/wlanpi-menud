@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "error",
+  "id": "c15",
+  "code": "CONFLICT",
+  "message": "Scan already in progress",
+  "core_status": 409,
+  "retry_after_sec": 5
+}

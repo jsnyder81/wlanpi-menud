@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "invoke",
+  "id": "c6",
+  "node": "apps.scanner.scan",
+  "params": {
+    "adapter": {
+      "iface": "wlan1",
+      "namespace": null
+    }
+  }
+}

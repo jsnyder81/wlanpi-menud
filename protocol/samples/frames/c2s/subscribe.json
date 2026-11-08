@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "subscribe",
+  "id": "c3",
+  "topics": [
+    "device.summary",
+    "complications",
+    "alerts",
+    "jobs"
+  ]
+}

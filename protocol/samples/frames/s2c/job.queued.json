@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "c6",
+  "job_id": "j5521",
+  "node": "apps.scanner.scan",
+  "state": "queued",
+  "shared": false
+}

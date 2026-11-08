@@ -1,0 +1,78 @@
+{
+  "v": 1,
+  "type": "menu",
+  "id": "s:1",
+  "revision": 3,
+  "device_mode": "classic",
+  "nodes": [
+    {
+      "id": "network",
+      "label": "Network",
+      "parent": null,
+      "order": 10,
+      "kind": "branch"
+    },
+    {
+      "id": "network.publicip6",
+      "label": "Public IPv6",
+      "parent": "network",
+      "order": 80,
+      "kind": "action",
+      "view": "kv",
+      "mutates": false
+    },
+    {
+      "id": "system",
+      "label": "System",
+      "parent": null,
+      "order": 50,
+      "kind": "branch"
+    },
+    {
+      "id": "system.reboot",
+      "label": "Reboot",
+      "parent": "system",
+      "order": 60,
+      "kind": "action",
+      "view": "status",
+      "mutates": true,
+      "confirm": {
+        "title": "Reboot",
+        "message": "Reboot the WLAN Pi now?"
+      }
+    },
+    {
+      "id": "system.reg_domain.set",
+      "label": "Set Domain",
+      "parent": "system",
+      "order": 20,
+      "kind": "action",
+      "mutates": true,
+      "params": [
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "enum",
+          "choices": [
+            {
+              "value": "US",
+              "label": "US"
+            },
+            {
+              "value": "GB",
+              "label": "GB"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "plugin.acme.status",
+      "label": "Acme Status",
+      "parent": "utils",
+      "order": 900,
+      "kind": "action",
+      "provider": "acme"
+    }
+  ]
+}

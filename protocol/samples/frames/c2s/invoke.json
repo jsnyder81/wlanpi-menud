@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "type": "invoke",
+  "id": "c5",
+  "node": "system.reg_domain.set",
+  "params": {
+    "country": "GB"
+  }
+}

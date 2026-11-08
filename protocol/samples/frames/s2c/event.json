@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:7",
+  "topic": "device.summary",
+  "seq": 42,
+  "data": {
+    "hostname": "wlanpi-a1b2",
+    "mode": "classic",
+    "eth0": "192.0.2.10",
+    "cpu_temp": "48.2C"
+  }
+}

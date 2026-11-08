@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "s:1",
+  "job_id": "j0001",
+  "node": "system.about",
+  "state": "result",
+  "result": {
+    "blocks": [
+      {
+        "type": "kv",
+        "items": [
+          {
+            "key": "Model",
+            "value": "R4"
+          }
+        ]
+      }
+    ]
+  }
+}

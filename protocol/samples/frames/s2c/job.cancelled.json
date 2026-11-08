@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "c11",
+  "job_id": "j5522",
+  "node": "utils.speedtest.run",
+  "state": "cancelled"
+}

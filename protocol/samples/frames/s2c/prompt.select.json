@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "type": "prompt",
+  "id": "s:3",
+  "prompt_id": "p91c2",
+  "job_id": "j5521",
+  "node": "apps.scanner.scan",
+  "kind": "select",
+  "title": "Scan adapter",
+  "message": "More than one adapter can scan. Pick one.",
+  "options": [
+    {
+      "value": {
+        "iface": "wlan0",
+        "namespace": "ns_wlan0"
+      },
+      "label": "wlan0",
+      "detail": "ns_wlan0, monitor"
+    },
+    {
+      "value": {
+        "iface": "wlan1",
+        "namespace": null
+      },
+      "label": "wlan1",
+      "detail": "root, monitor"
+    }
+  ],
+  "expires_sec": 120
+}

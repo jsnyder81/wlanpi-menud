@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "x.y",
+      "label": "Y",
+      "parent": "x",
+      "order": 10,
+      "visibility": {
+        "modes": [
+          "turbo"
+        ]
+      }
+    }
+  ]
+}

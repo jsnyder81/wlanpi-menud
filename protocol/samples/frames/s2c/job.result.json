@@ -1,0 +1,52 @@
+{
+  "v": 1,
+  "type": "job",
+  "id": "s:5",
+  "job_id": "j5521",
+  "node": "apps.scanner.scan",
+  "state": "result",
+  "shared": true,
+  "cached_at": "2026-11-08T14:03:12Z",
+  "result": {
+    "title": "Scan",
+    "total": 37,
+    "cursor": "eyJvZmZzZXQiOjE2fQ",
+    "blocks": [
+      {
+        "type": "table",
+        "text": "SSID       CH  RSSI\nCorpNet    36  -51\nGuest       6  -63",
+        "columns": [
+          {
+            "key": "ssid",
+            "label": "SSID",
+            "priority": 0
+          },
+          {
+            "key": "ch",
+            "label": "CH",
+            "align": "right",
+            "priority": 1
+          },
+          {
+            "key": "rssi",
+            "label": "RSSI",
+            "align": "right",
+            "priority": 0
+          }
+        ],
+        "rows": [
+          [
+            "CorpNet",
+            36,
+            -51
+          ],
+          [
+            "Guest",
+            6,
+            -63
+          ]
+        ]
+      }
+    ]
+  }
+}

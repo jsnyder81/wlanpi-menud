@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "type": "view",
+  "id": "s:2",
+  "screen": "home",
+  "node": null,
+  "title": "wlanpi-a1b2",
+  "blocks": [
+    {
+      "type": "kv",
+      "text": "eth0: 192.0.2.10\nMode: Classic",
+      "items": [
+        {
+          "key": "eth0",
+          "value": "192.0.2.10"
+        },
+        {
+          "key": "Mode",
+          "value": "Classic"
+        }
+      ]
+    },
+    {
+      "type": "status",
+      "level": "ok",
+      "label": "Profiler",
+      "text": "Profiler: running"
+    }
+  ]
+}

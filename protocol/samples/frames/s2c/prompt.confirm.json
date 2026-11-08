@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "prompt",
+  "id": "c12",
+  "prompt_id": "p91c3",
+  "node": "system.reboot",
+  "kind": "confirm",
+  "title": "Reboot",
+  "message": "Reboot the WLAN Pi now?",
+  "confirm_label": "Reboot",
+  "cancel_label": "Cancel"
+}

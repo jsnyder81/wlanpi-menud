@@ -1,0 +1,965 @@
+{
+  "$schema": "../../menu.schema.json",
+  "schema": 1,
+  "nodes": [
+    {
+      "id": "network",
+      "label": "Network",
+      "parent": null,
+      "order": 10
+    },
+    {
+      "id": "network.interfaces",
+      "label": "Interfaces",
+      "parent": "network",
+      "order": 10,
+      "action": {
+        "handler": "network.interfaces",
+        "view": "table"
+      }
+    },
+    {
+      "id": "network.wlan_interfaces",
+      "label": "WLAN Interfaces",
+      "parent": "network",
+      "order": 20,
+      "action": {
+        "handler": "network.wlan_interfaces",
+        "view": "table"
+      }
+    },
+    {
+      "id": "network.eth0_ipconfig",
+      "label": "Eth0 IP Config",
+      "parent": "network",
+      "order": 30,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 10,
+        "select": "/eth0_ipconfig_info"
+      }
+    },
+    {
+      "id": "network.eth0_vlan",
+      "label": "Eth0 VLAN",
+      "parent": "network",
+      "order": 40,
+      "action": {
+        "core": "GET /network/ethernet/eth0/vlan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 10
+      }
+    },
+    {
+      "id": "network.lldp",
+      "label": "LLDP Neighbour",
+      "parent": "network",
+      "order": 50,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30,
+        "select": "/lldp_neighbour_info"
+      }
+    },
+    {
+      "id": "network.cdp",
+      "label": "CDP Neighbour",
+      "parent": "network",
+      "order": 60,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30,
+        "select": "/cdp_neighbour_info"
+      }
+    },
+    {
+      "id": "network.publicip4",
+      "label": "Public IPv4",
+      "parent": "network",
+      "order": 70,
+      "action": {
+        "core": "GET /network/info/",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 60,
+        "select": "/public_ip"
+      }
+    },
+    {
+      "id": "network.publicip6",
+      "label": "Public IPv6",
+      "parent": "network",
+      "order": 80,
+      "action": {
+        "core": "GET /network/info/publicip6",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 60
+      }
+    },
+    {
+      "id": "bluetooth",
+      "label": "Bluetooth",
+      "parent": null,
+      "order": 20,
+      "visibility": {
+        "capabilities": [
+          "bluetooth"
+        ]
+      }
+    },
+    {
+      "id": "bluetooth.status",
+      "label": "Status",
+      "parent": "bluetooth",
+      "order": 10,
+      "action": {
+        "core": "GET /bluetooth/status",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "bluetooth.on",
+      "label": "Turn On",
+      "parent": "bluetooth",
+      "order": 20,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /bluetooth/power/on",
+        "view": "status"
+      }
+    },
+    {
+      "id": "bluetooth.off",
+      "label": "Turn Off",
+      "parent": "bluetooth",
+      "order": 30,
+      "action": {
+        "core": "POST /bluetooth/power/off",
+        "view": "status"
+      }
+    },
+    {
+      "id": "bluetooth.pair",
+      "label": "Pair Device",
+      "parent": "bluetooth",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /bluetooth/pair",
+        "view": "status"
+      }
+    },
+    {
+      "id": "utils",
+      "label": "Utils",
+      "parent": null,
+      "order": 30
+    },
+    {
+      "id": "utils.reachability",
+      "label": "Reachability",
+      "parent": "utils",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/reachability",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 15,
+        "timeout_sec": 60
+      }
+    },
+    {
+      "id": "utils.speedtest",
+      "label": "Speedtest",
+      "parent": "utils",
+      "order": 20
+    },
+    {
+      "id": "utils.speedtest.run",
+      "label": "Run Test",
+      "parent": "utils.speedtest",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/speedtest",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 10,
+        "timeout_sec": 120,
+        "cancellable": true
+      }
+    },
+    {
+      "id": "utils.cloud",
+      "label": "Cloud Tests",
+      "parent": "utils",
+      "order": 30,
+      "visibility": {
+        "requires_core": "GET /utils/cloud-test/{vendor}"
+      }
+    },
+    {
+      "id": "utils.cloud.arista",
+      "label": "Arista CV-CUE",
+      "parent": "utils.cloud",
+      "order": 10,
+      "action": {
+        "core": "GET /utils/cloud-test/arista",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.aruba",
+      "label": "Aruba Central",
+      "parent": "utils.cloud",
+      "order": 20,
+      "action": {
+        "core": "GET /utils/cloud-test/aruba",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.extreme",
+      "label": "ExtremeCloud IQ",
+      "parent": "utils.cloud",
+      "order": 30,
+      "action": {
+        "core": "GET /utils/cloud-test/extreme",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.meraki",
+      "label": "Meraki Cloud",
+      "parent": "utils.cloud",
+      "order": 40,
+      "action": {
+        "core": "GET /utils/cloud-test/meraki",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.mist",
+      "label": "Mist Cloud",
+      "parent": "utils.cloud",
+      "order": 50,
+      "action": {
+        "core": "GET /utils/cloud-test/mist",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.cloud.ruckus",
+      "label": "RUCKUS Cloud",
+      "parent": "utils.cloud",
+      "order": 60,
+      "action": {
+        "core": "GET /utils/cloud-test/ruckus",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 60,
+        "timeout_sec": 90
+      }
+    },
+    {
+      "id": "utils.port_blinker",
+      "label": "Port Blinker",
+      "parent": "utils",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "ethernet"
+        ]
+      }
+    },
+    {
+      "id": "utils.port_blinker.start",
+      "label": "Start",
+      "parent": "utils.port_blinker",
+      "order": 10,
+      "action": {
+        "core": "POST /utils/blinker/start",
+        "view": "status",
+        "query": {
+          "interface": "eth0"
+        }
+      }
+    },
+    {
+      "id": "utils.port_blinker.stop",
+      "label": "Stop",
+      "parent": "utils.port_blinker",
+      "order": 20,
+      "action": {
+        "core": "POST /utils/blinker/stop",
+        "view": "status"
+      }
+    },
+    {
+      "id": "utils.ssid_passphrase",
+      "label": "SSID/Passphrase",
+      "parent": "utils",
+      "order": 50,
+      "visibility": {
+        "not_modes": [
+          "classic"
+        ],
+        "min_role": "operator"
+      },
+      "action": {
+        "handler": "utils.ssid_passphrase",
+        "view": "qr"
+      }
+    },
+    {
+      "id": "utils.usb",
+      "label": "USB Devices",
+      "parent": "utils",
+      "order": 60,
+      "action": {
+        "core": "GET /utils/usb",
+        "view": "list",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "utils.ufw",
+      "label": "UFW Ports",
+      "parent": "utils",
+      "order": 70,
+      "action": {
+        "core": "GET /utils/ufw",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    },
+    {
+      "id": "modes",
+      "label": "Modes",
+      "parent": null,
+      "order": 35,
+      "visibility": {
+        "modes": [
+          "classic",
+          "hotspot"
+        ],
+        "requires_core": "POST /system/mode/switch"
+      }
+    },
+    {
+      "id": "modes.hotspot",
+      "label": "Hotspot",
+      "parent": "modes",
+      "order": 10,
+      "visibility": {
+        "modes": [
+          "classic"
+        ],
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "hotspot"
+        },
+        "confirm": {
+          "title": "Hotspot",
+          "message": "Switch to Hotspot mode? The WLAN Pi reboots."
+        }
+      }
+    },
+    {
+      "id": "modes.classic",
+      "label": "Classic Mode",
+      "parent": "modes",
+      "order": 20,
+      "visibility": {
+        "modes": [
+          "hotspot"
+        ]
+      },
+      "action": {
+        "core": "POST /system/mode/switch",
+        "view": "status",
+        "body": {
+          "mode": "classic"
+        },
+        "confirm": {
+          "title": "Classic",
+          "message": "Switch to Classic mode? The WLAN Pi reboots."
+        }
+      }
+    },
+    {
+      "id": "apps",
+      "label": "Apps",
+      "parent": null,
+      "order": 40,
+      "visibility": {
+        "modes": [
+          "classic"
+        ]
+      }
+    },
+    {
+      "id": "apps.kismet",
+      "label": "Kismet",
+      "parent": "apps",
+      "order": 10
+    },
+    {
+      "id": "apps.kismet.start",
+      "label": "Start",
+      "parent": "apps.kismet",
+      "order": 10,
+      "action": {
+        "core": "POST /system/service/start",
+        "view": "status",
+        "query": {
+          "name": "kismet"
+        }
+      }
+    },
+    {
+      "id": "apps.kismet.stop",
+      "label": "Stop",
+      "parent": "apps.kismet",
+      "order": 20,
+      "action": {
+        "core": "POST /system/service/stop",
+        "view": "status",
+        "query": {
+          "name": "kismet"
+        }
+      }
+    },
+    {
+      "id": "apps.profiler",
+      "label": "Profiler",
+      "parent": "apps",
+      "order": 20
+    },
+    {
+      "id": "apps.profiler.status",
+      "label": "Status",
+      "parent": "apps.profiler",
+      "order": 10,
+      "action": {
+        "handler": "apps.profiler.status",
+        "view": "qr"
+      }
+    },
+    {
+      "id": "apps.profiler.stop",
+      "label": "Stop",
+      "parent": "apps.profiler",
+      "order": 20,
+      "action": {
+        "core": "POST /profiler/stop",
+        "view": "status"
+      }
+    },
+    {
+      "id": "apps.profiler.start",
+      "label": "Start",
+      "parent": "apps.profiler",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      },
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {}
+      }
+    },
+    {
+      "id": "apps.profiler.start_other",
+      "label": "Start Other",
+      "parent": "apps.profiler",
+      "order": 40,
+      "visibility": {
+        "capabilities": [
+          "transmit"
+        ]
+      }
+    },
+    {
+      "id": "apps.profiler.start_2_4",
+      "label": "Start 2.4 GHz",
+      "parent": "apps.profiler.start_other",
+      "order": 10,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 6
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_5_36",
+      "label": "Start 5 GHz 36",
+      "parent": "apps.profiler.start_other",
+      "order": 20,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 36
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_5_149",
+      "label": "Start 5 GHz 149",
+      "parent": "apps.profiler.start_other",
+      "order": 30,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "channel": 149
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_no11r",
+      "label": "Start (no 11r)",
+      "parent": "apps.profiler.start_other",
+      "order": 40,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "no11r": true
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.start_no11ax",
+      "label": "Start (no 11ax)",
+      "parent": "apps.profiler.start_other",
+      "order": 50,
+      "action": {
+        "core": "POST /profiler/start",
+        "view": "status",
+        "body": {
+          "no11ax": true
+        }
+      }
+    },
+    {
+      "id": "apps.profiler.purge",
+      "label": "Purge Data",
+      "parent": "apps.profiler",
+      "order": 50,
+      "visibility": {
+        "min_role": "admin"
+      },
+      "action": {
+        "core": "POST /profiler/purge",
+        "view": "status",
+        "confirm": {
+          "title": "Purge",
+          "message": "Delete all profiler client profiles, captures and reports? This cannot be undone."
+        }
+      }
+    },
+    {
+      "id": "apps.scanner",
+      "label": "Scanner",
+      "parent": "apps",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "monitor_adapter"
+        ]
+      }
+    },
+    {
+      "id": "apps.scanner.scan",
+      "label": "Scan",
+      "parent": "apps.scanner",
+      "order": 10,
+      "params": [
+        {
+          "name": "adapter",
+          "label": "Adapter",
+          "type": "adapter",
+          "kind": "wlan",
+          "monitor": true,
+          "required": false
+        }
+      ],
+      "action": {
+        "core": "GET /utils/wlan/scan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30,
+        "timeout_sec": 60,
+        "query": {
+          "hidden": true
+        },
+        "bind": {
+          "adapter": "query"
+        }
+      }
+    },
+    {
+      "id": "apps.scanner.scan_nohidden",
+      "label": "Scan (no hidden)",
+      "parent": "apps.scanner",
+      "order": 20,
+      "params": [
+        {
+          "name": "adapter",
+          "label": "Adapter",
+          "type": "adapter",
+          "kind": "wlan",
+          "monitor": true,
+          "required": false
+        }
+      ],
+      "action": {
+        "core": "GET /utils/wlan/scan",
+        "view": "table",
+        "shareable": true,
+        "fresh_sec": 30,
+        "timeout_sec": 60,
+        "query": {
+          "hidden": false
+        },
+        "bind": {
+          "adapter": "query"
+        }
+      }
+    },
+    {
+      "id": "apps.scanner.csv",
+      "label": "Scan to CSV",
+      "parent": "apps.scanner",
+      "order": 30,
+      "visibility": {
+        "requires_core": "POST /scanner/scan/csv"
+      },
+      "action": {
+        "handler": "apps.scanner.csv",
+        "view": "status"
+      }
+    },
+    {
+      "id": "apps.scanner.pcap",
+      "label": "Scan to PCAP",
+      "parent": "apps.scanner",
+      "order": 40,
+      "visibility": {
+        "requires_core": [
+          "POST /scanner/capture/start",
+          "POST /scanner/capture/stop"
+        ]
+      }
+    },
+    {
+      "id": "apps.scanner.pcap_start",
+      "label": "Start",
+      "parent": "apps.scanner.pcap",
+      "order": 10,
+      "action": {
+        "handler": "apps.scanner.pcap_start",
+        "view": "status",
+        "cancellable": true
+      }
+    },
+    {
+      "id": "apps.scanner.pcap_stop",
+      "label": "Stop",
+      "parent": "apps.scanner.pcap",
+      "order": 20,
+      "action": {
+        "handler": "apps.scanner.pcap_stop",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system",
+      "label": "System",
+      "parent": null,
+      "order": 50
+    },
+    {
+      "id": "system.about",
+      "label": "About",
+      "parent": "system",
+      "order": 10,
+      "action": {
+        "core": "GET /system/device/info",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 300
+      }
+    },
+    {
+      "id": "system.help",
+      "label": "Help",
+      "parent": "system",
+      "order": 20,
+      "action": {
+        "handler": "system.help",
+        "view": "qr"
+      }
+    },
+    {
+      "id": "system.summary",
+      "label": "Summary",
+      "parent": "system",
+      "order": 30,
+      "action": {
+        "core": "GET /system/device/stats",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 5
+      }
+    },
+    {
+      "id": "system.battery",
+      "label": "Battery",
+      "parent": "system",
+      "order": 40,
+      "action": {
+        "core": "GET /system/battery",
+        "view": "status",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    },
+    {
+      "id": "system.settings",
+      "label": "Settings",
+      "parent": "system",
+      "order": 50
+    },
+    {
+      "id": "system.settings.datetime",
+      "label": "Date & Time",
+      "parent": "system.settings",
+      "order": 10
+    },
+    {
+      "id": "system.date",
+      "label": "Show Time & Zone",
+      "parent": "system.settings.datetime",
+      "order": 10,
+      "action": {
+        "core": "GET /system/datetime",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 1
+      }
+    },
+    {
+      "id": "system.timezone",
+      "label": "Set Timezone",
+      "parent": "system.settings.datetime",
+      "order": 20,
+      "visibility": {
+        "min_role": "operator"
+      }
+    },
+    {
+      "id": "system.timezone.auto",
+      "label": "Auto",
+      "parent": "system.timezone",
+      "order": 10,
+      "action": {
+        "core": "POST /system/timezone/auto",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system.timezone.set",
+      "label": "Manual",
+      "parent": "system.timezone",
+      "order": 20,
+      "action": {
+        "handler": "system.timezone.pick",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system.settings.rf_domain",
+      "label": "RF Domain",
+      "parent": "system.settings",
+      "order": 20
+    },
+    {
+      "id": "system.reg_domain.show",
+      "label": "Show Domain",
+      "parent": "system.settings.rf_domain",
+      "order": 10,
+      "action": {
+        "core": "GET /system/reg-domain",
+        "view": "kv",
+        "shareable": true,
+        "fresh_sec": 30
+      }
+    },
+    {
+      "id": "system.reg_domain.set",
+      "label": "Set Domain",
+      "parent": "system.settings.rf_domain",
+      "order": 20,
+      "visibility": {
+        "min_role": "admin"
+      },
+      "params": [
+        {
+          "name": "country",
+          "label": "Country",
+          "type": "enum",
+          "choices": [
+            {
+              "value": "US",
+              "label": "US"
+            },
+            {
+              "value": "AU",
+              "label": "AU"
+            },
+            {
+              "value": "BR",
+              "label": "BR"
+            },
+            {
+              "value": "CA",
+              "label": "CA"
+            },
+            {
+              "value": "CZ",
+              "label": "CZ"
+            },
+            {
+              "value": "DE",
+              "label": "DE"
+            },
+            {
+              "value": "FR",
+              "label": "FR"
+            },
+            {
+              "value": "GB",
+              "label": "GB"
+            },
+            {
+              "value": "NL",
+              "label": "NL"
+            },
+            {
+              "value": "NO",
+              "label": "NO"
+            }
+          ]
+        }
+      ],
+      "action": {
+        "core": "POST /system/reg-domain/set",
+        "view": "status",
+        "bind": {
+          "country": "body"
+        },
+        "confirm": {
+          "title": "RF Domain",
+          "message": "Change the regulatory domain? A reboot is needed to apply it."
+        }
+      }
+    },
+    {
+      "id": "system.rotate_display",
+      "label": "Rotate Display",
+      "parent": "system.settings",
+      "order": 30,
+      "visibility": {
+        "capabilities": [
+          "display"
+        ]
+      },
+      "action": {
+        "handler": "system.rotate_display",
+        "view": "status"
+      }
+    },
+    {
+      "id": "system.reboot",
+      "label": "Reboot",
+      "parent": "system",
+      "order": 60,
+      "visibility": {
+        "min_role": "operator"
+      },
+      "action": {
+        "core": "POST /system/reboot",
+        "view": "status",
+        "confirm": {
+          "title": "Reboot",
+          "message": "Reboot the WLAN Pi now?"
+        }
+      }
+    },
+    {
+      "id": "system.shutdown",
+      "label": "Shutdown",
+      "parent": "system",
+      "order": 70,
+      "visibility": {
+        "min_role": "operator"
+      },
+      "action": {
+        "core": "POST /system/shutdown",
+        "view": "status",
+        "confirm": {
+          "title": "Shutdown",
+          "message": "Shut down the WLAN Pi now?"
+        }
+      }
+    }
+  ]
+}
