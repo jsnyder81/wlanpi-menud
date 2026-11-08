@@ -1,0 +1,199 @@
+wlanpi-menud epoch 0zdGanehNmZbAGGd; sockets in /tmp/menud-demo-68s78gth
+menu: 76 nodes registered, 0 files rejected
+
+A: session SRmDsCl3xFGy86NV2 as local uid 1000 roles ['admin']
+  A | [home] WLAN Pi
+  A |     Host: wlanpi-test
+  A |     Mode: classic
+  A |     IP: 192.0.2.10
+  A |     Model: R4
+  A |     Temp: 48.0C
+B: session SxVrd_151Y_k1JTrX as local uid 1000 roles ['admin']
+  B | [home] WLAN Pi
+  B |     Host: wlanpi-test
+  B |     Mode: classic
+  B |     IP: 192.0.2.10
+  B |     Model: R4
+  B |     Temp: 48.0C
+
+A presses down:
+  A | [menu] Menu
+  A |     > Network >
+  A |       Bluetooth >
+  A |       Utils >
+  A |       Apps >
+  A |       System >
+B presses down:
+  B | [menu] Menu
+  B |     > Network >
+  B |       Bluetooth >
+  B |       Utils >
+  B |       Apps >
+  B |       System >
+A presses center:
+  A | [menu] Network   (Network)
+  A |     > Interfaces
+  A |       WLAN Interfaces
+  A |       Adapters
+  A |       Eth0 IP Config
+  A |       Eth0 VLAN
+  A |       LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+B presses down:
+  B | [menu] Menu
+  B |       Network >
+  B |     > Bluetooth >
+  B |       Utils >
+  B |       Apps >
+  B |       System >
+A presses down:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |     > WLAN Interfaces
+  A |       Adapters
+  A |       Eth0 IP Config
+  A |       Eth0 VLAN
+  A |       LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+A presses down:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |       WLAN Interfaces
+  A |     > Adapters
+  A |       Eth0 IP Config
+  A |       Eth0 VLAN
+  A |       LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+A presses down:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |       WLAN Interfaces
+  A |       Adapters
+  A |     > Eth0 IP Config
+  A |       Eth0 VLAN
+  A |       LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+A presses down:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |       WLAN Interfaces
+  A |       Adapters
+  A |       Eth0 IP Config
+  A |     > Eth0 VLAN
+  A |       LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+A presses down:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |       WLAN Interfaces
+  A |       Adapters
+  A |       Eth0 IP Config
+  A |       Eth0 VLAN
+  A |     > LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+B presses center:
+  B | [menu] Bluetooth   (Bluetooth)
+  B |     > Status
+  B |       Turn On
+  B |       Turn Off
+  B |       Pair Device
+A presses center:
+  A | [result] LLDP Neighbour   (Network)
+  A |     Name: sw1
+  A |     Port: Gi1/0/7
+  A |     page 1/1
+B presses down:
+  B | [menu] Bluetooth   (Bluetooth)
+  B |       Status
+  B |     > Turn On
+  B |       Turn Off
+  B |       Pair Device
+B presses left:
+  B | [menu] Menu
+  B |       Network >
+  B |     > Bluetooth >
+  B |       Utils >
+  B |       Apps >
+  B |       System >
+B presses down:
+  B | [menu] Menu
+  B |       Network >
+  B |       Bluetooth >
+  B |     > Utils >
+  B |       Apps >
+  B |       System >
+B presses down:
+  B | [menu] Menu
+  B |       Network >
+  B |       Bluetooth >
+  B |       Utils >
+  B |     > Apps >
+  B |       System >
+B presses center:
+  B | [menu] Apps   (Apps)
+  B |     > Kismet >
+  B |       Profiler >
+  B |       Scanner >
+B presses down:
+  B | [menu] Apps   (Apps)
+  B |       Kismet >
+  B |     > Profiler >
+  B |       Scanner >
+B presses down:
+  B | [menu] Apps   (Apps)
+  B |       Kismet >
+  B |       Profiler >
+  B |     > Scanner >
+B presses center:
+  B | [menu] Scanner   (Apps > Scanner)
+  B |     > Scan
+  B |       Scan (no hidden)
+B presses center:
+  B | [result] Scan   (Apps > Scanner)
+  B |     Ssid | Bssid | Channel | Signal
+  B |     net000 | 02:00:00:00:00:00 | 1 | -40
+  B |     net001 | 02:00:00:00:00:01 | 2 | -41
+  B |     net002 | 02:00:00:00:00:02 | 3 | -42
+  B |     net003 | 02:00:00:00:00:03 | 4 | -43
+  B |     net004 | 02:00:00:00:00:04 | 5 | -44
+  B |     net005 | 02:00:00:00:00:05 | 6 | -45
+  B |     net006 | 02:00:00:00:00:06 | 7 | -46
+  B |     net007 | 02:00:00:00:00:07 | 8 | -47
+  B |     page 1/2
+A presses left:
+  A | [menu] Network   (Network)
+  A |       Interfaces
+  A |       WLAN Interfaces
+  A |       Adapters
+  A |       Eth0 IP Config
+  A |       Eth0 VLAN
+  A |     > LLDP Neighbour
+  A |       CDP Neighbour
+  A |       Public IPv4
+  A |       Public IPv6
+B presses down:
+  B | [result] Scan   (Apps > Scanner)
+  B |     Ssid | Bssid | Channel | Signal
+  B |     net020 | 02:00:00:00:00:14 | 10 | -60
+  B |     net021 | 02:00:00:00:00:15 | 11 | -61
+  B |     net022 | 02:00:00:00:00:16 | 1 | -62
+  B |     net023 | 02:00:00:00:00:17 | 2 | -63
+  B |     net024 | 02:00:00:00:00:18 | 3 | -64
+  B |     net025 | 02:00:00:00:00:19 | 4 | -65
+  B |     page 2/2
+
+A cursor: screen=menu stack=['network'] index=5 node=None page=0
+B cursor: screen=result stack=['apps', 'apps.scanner'] index=0 node=apps.scanner.scan page=1
+core calls: LLDP/network info x1, scan x1
