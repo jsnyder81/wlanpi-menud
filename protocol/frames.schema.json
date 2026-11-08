@@ -373,20 +373,11 @@
         "order": { "type": "integer" },
         "kind": { "enum": ["branch", "action"] },
         "params": {
-          "description": "Same shape as the manifest's params.",
+          "description": "Same shape as the manifest's params. $defs segment, param, param_* and confirm are copies of menu.schema.json's so generated models get typed unions; protocol/tests keeps them identical.",
           "type": "array",
-          "items": { "type": "object", "required": ["name", "label", "type"] }
+          "items": { "$ref": "#/$defs/param" }
         },
-        "confirm": {
-          "type": "object",
-          "required": ["message"],
-          "properties": {
-            "title": { "type": "string" },
-            "message": { "type": "string" },
-            "confirm_label": { "type": "string" },
-            "cancel_label": { "type": "string" }
-          }
-        },
+        "confirm": { "$ref": "#/$defs/confirm" },
         "view": { "$ref": "#/$defs/block_type" },
         "cancellable": { "type": "boolean" },
         "mutates": { "type": "boolean" },
@@ -474,7 +465,7 @@
         "fields": {
           "description": "form only: manifest parameter definitions.",
           "type": "array",
-          "items": { "type": "object", "required": ["name", "label", "type"] }
+          "items": { "$ref": "#/$defs/param" }
         },
         "confirm_label": { "type": "string", "maxLength": 16 },
         "cancel_label": { "type": "string", "maxLength": 16 },
@@ -607,6 +598,14 @@
         "retry_after_sec": { "type": "integer", "minimum": 0 }
       }
     },
+
+    "segment": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$", "maxLength": 32},
+    "param": {"description": "Rich clients render a form; thin clients get one prompt per parameter, in order.", "oneOf": [{"$ref": "#/$defs/param_enum"}, {"$ref": "#/$defs/param_integer"}, {"$ref": "#/$defs/param_string"}, {"$ref": "#/$defs/param_adapter"}]},
+    "param_enum": {"type": "object", "additionalProperties": false, "required": ["name", "label", "type", "choices"], "properties": {"name": {"$ref": "#/$defs/segment"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}, "required": {"type": "boolean", "default": true}, "type": {"const": "enum"}, "choices": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["value", "label"], "properties": {"value": {"type": ["string", "integer", "boolean"]}, "label": {"type": "string", "minLength": 1, "maxLength": 32}}}}, "default": {"type": ["string", "integer", "boolean"]}}},
+    "param_integer": {"type": "object", "additionalProperties": false, "required": ["name", "label", "type"], "properties": {"name": {"$ref": "#/$defs/segment"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}, "required": {"type": "boolean", "default": true}, "type": {"const": "integer"}, "minimum": {"type": "integer"}, "maximum": {"type": "integer"}, "step": {"type": "integer", "minimum": 1, "default": 1}, "default": {"type": "integer"}}},
+    "param_string": {"type": "object", "additionalProperties": false, "required": ["name", "label", "type"], "properties": {"name": {"$ref": "#/$defs/segment"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}, "required": {"type": "boolean", "default": true}, "type": {"const": "string"}, "pattern": {"type": "string", "format": "regex"}, "min_length": {"type": "integer", "minimum": 0}, "max_length": {"type": "integer", "minimum": 1}, "secret": {"description": "Never echoed in views, logs or job sharing. A node with a secret parameter is never shareable.", "type": "boolean", "default": false}, "default": {"type": "string"}}},
+    "param_adapter": {"description": "A Wi-Fi or Ethernet adapter. The value is {iface, namespace}; bound to 'query' it expands to the iface and namespace query parameters core's namespace-aware routes take. Choices come from core's /network/config/status at prompt time.", "type": "object", "additionalProperties": false, "required": ["name", "label", "type"], "properties": {"name": {"$ref": "#/$defs/segment"}, "label": {"type": "string", "minLength": 1, "maxLength": 32}, "required": {"type": "boolean", "default": true}, "type": {"const": "adapter"}, "kind": {"enum": ["wlan", "ethernet", "any"], "default": "wlan"}, "monitor": {"description": "Offer only adapters that can scan or capture in monitor mode.", "type": "boolean", "default": false}}},
+    "confirm": {"description": "Ask before running. The confirmation is bound to the invoking session and principal.", "type": "object", "additionalProperties": false, "required": ["message"], "properties": {"title": {"type": "string", "maxLength": 32}, "message": {"type": "string", "minLength": 1, "maxLength": 160}, "confirm_label": {"type": "string", "maxLength": 16, "default": "Confirm"}, "cancel_label": {"type": "string", "maxLength": 16, "default": "Cancel"}}},
 
     "block_type": { "enum": ["text", "kv", "table", "list", "qr", "status", "progress", "confirm"] },
     "block": {

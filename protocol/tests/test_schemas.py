@@ -141,3 +141,17 @@ def test_schema_enumerates_plan_vocabulary():
     for block in defs["block"]["oneOf"]:
         target = defs[block["$ref"].rsplit("/", 1)[-1]]
         assert "text" in target["required"], f"{block['$ref']} must carry a text fallback"
+
+
+def test_frame_param_defs_match_manifest_defs():
+    """menu_node.params, prompt.fields and confirm are typed with copies of the manifest defs."""
+    for name in ("segment", "param", "param_enum", "param_integer", "param_string", "param_adapter", "confirm"):
+        assert FRAMES_SCHEMA["$defs"][name] == MENU_SCHEMA["$defs"][name], name
+    defs = FRAMES_SCHEMA["$defs"]
+    assert defs["menu_node"]["properties"]["params"]["items"] == {"$ref": "#/$defs/param"}
+    assert defs["prompt"]["properties"]["fields"]["items"] == {"$ref": "#/$defs/param"}
+    assert defs["menu_node"]["properties"]["confirm"] == {"$ref": "#/$defs/confirm"}
+    loose = {"v": 1, "type": "menu", "id": "s:1", "revision": 0, "nodes": [
+        {"id": "a", "label": "A", "parent": None, "order": 1, "kind": "action",
+         "params": [{"name": "x", "label": "X", "type": "enum"}]}]}  # enum without choices
+    assert not Draft202012Validator(FRAMES_SCHEMA).is_valid(loose)
