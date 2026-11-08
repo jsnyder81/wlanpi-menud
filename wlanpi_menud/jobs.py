@@ -7,7 +7,11 @@ Rules (plan: "Jobs, sharing and conflicts"; PROTOCOL.md "Jobs", "Prompts"):
   manifest says. Mutations are never shared, deduplicated or cached: every
   invoke of a mutation is a new job.
 * A prompt (parameter, confirmation or mid-job selection) is bound to the
-  session and principal that invoked the job. Anyone else gets FORBIDDEN.
+  session that invoked the job. On the default session it goes to every
+  attached connection and the first answer wins; a confirmation stays bound
+  to the invoking principal (any connection of that principal may answer).
+  An independent session's prompts stay private to it. Anyone else gets
+  FORBIDDEN.
 * ``cancel`` detaches the caller. The job stops only when no session is
   still attached and the action is cancellable. A job that has not started
   executing (still collecting parameters or a confirmation) has done
@@ -40,8 +44,9 @@ from .handlers.base import BoundCore
 from .menu import Node
 
 if TYPE_CHECKING:
+    from .auth import Principal
     from .service import Service
-    from .session import Session
+    from .session import Attachment, Session
 
 log = logging.getLogger(__name__)
 audit = logging.getLogger("wlanpi_menud.audit")
@@ -98,6 +103,7 @@ class Job:
     finished_at: float | None = None
     timeout_cm: Any = None
     prompts: set[str] = field(default_factory=set)
+    invoker: Principal | None = None
 
     @property
     def shared(self) -> bool:
@@ -192,7 +198,7 @@ def build_request(node: Node, params: dict[str, Any]) -> tuple[str, str, dict[st
 
 
 class JobManager:
-    def __init__(self, service: "Service"):
+    def __init__(self, service: Service):
         self.service = service
         self.jobs: dict[str, Job] = {}
         self.prompts: dict[str, Prompt] = {}
@@ -236,13 +242,14 @@ class JobManager:
 
     # ------------------------------------------------------------------ invoke
 
-    def invoke(self, session: "Session", node_id: str, params: dict[str, Any] | None, confirmed: bool,
-               msg_id: str) -> Job:
-        """Start (or attach to) a job. Sends the queued/shared reply with ``msg_id``. Raises InvokeRefused."""
+    def invoke(self, session: Session, a: Attachment, node_id: str, params: dict[str, Any] | None,
+               confirmed: bool, msg_id: str) -> Job:
+        """Start (or attach to) a job for ``a``'s session. ``a`` gets the queued/shared reply with
+        ``msg_id``; other connections on the session get a copy. Raises InvokeRefused."""
         node = self.service.menu.get(node_id)
         if node is None:
             raise InvokeRefused("NOT_FOUND", f"unknown node {node_id}")
-        if not session.menu_view.visible(node_id):
+        if not a.menu_view.visible(node_id):
             raise InvokeRefused("FORBIDDEN", f"{node_id} is not available to this session")
         if node.is_branch:
             raise InvokeRefused("BAD_REQUEST", f"{node_id} is a branch, not an action")
@@ -258,8 +265,9 @@ class JobManager:
             params[name] = coerced
 
         missing = [p for p in node.params if p["name"] not in params and p.get("required", True)]
-        principal = session.principal
-        audit.info("invoke %s by %s (%s) session %s", node_id, principal.name, principal.kind, session.id)
+        principal = a.principal
+        audit.info("invoke %s by %s (%s) session %s (%s)", node_id, principal.name, principal.kind, session.id,
+                   session.kind)
 
         share_key = None
         if node.shareable and not missing:
@@ -271,7 +279,7 @@ class JobManager:
                 if existing.live or fresh:
                     existing.attached.add(session.id)
                     session.jobs.add(existing.id)
-                    session.send(self.job_frame(existing, msg_id, shared=True))
+                    session.send(self.job_frame(existing, msg_id, shared=True), reply_to=a)
                     if self.on_change:
                         self.on_change()
                     return existing
@@ -280,13 +288,14 @@ class JobManager:
             id=_new_id("j"), node=node, params=params, owner=session.id, principal_key=principal.key,
             token=principal.token if principal.kind == "jwt" else None,
             confirmed=confirmed and session.mode == "rich", rich=session.mode == "rich", share_key=share_key,
+            invoker=principal,
         )
         job.attached.add(session.id)
         session.jobs.add(job.id)
         self.jobs[job.id] = job
         if share_key:
             self._share[share_key] = job.id
-        session.send(self.job_frame(job, msg_id))
+        session.send(self.job_frame(job, msg_id), reply_to=a)
         job.task = asyncio.get_running_loop().create_task(self._run(job), name=f"job {job.id} {node.id}")
         if self.on_change:
             self.on_change()
@@ -310,6 +319,8 @@ class JobManager:
                                  "expires_sec": self.service.config.prompt_expires_sec}
         if message:
             frame["message"] = message[:256]
+        if job.invoker is not None:
+            frame["invoked_by"] = job.invoker.frame()
         values: list[Any] = []
         if kind == "select":
             opts = []
@@ -333,7 +344,7 @@ class JobManager:
                 frame["default"] = param["default"]
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
-        p = Prompt(pid, owner.id, owner.principal.key, job.id, job.node.id, kind, frame, values, fut,
+        p = Prompt(pid, owner.id, job.principal_key, job.id, job.node.id, kind, frame, values, fut,
                    fields=fields or ([param] if param else []))
         p.timer = loop.call_later(self.service.config.prompt_expires_sec, self._expire, pid)
         self.prompts[pid] = p
@@ -365,13 +376,28 @@ class JobManager:
         if p and not p.future.done():
             p.future.set_exception(PromptCancelled("prompt expired"))
 
-    def answer(self, session: "Session", frame: dict[str, Any]) -> None:
+    def may_answer(self, session: Session, a: Attachment, p: Prompt) -> bool:
+        """Whether ``a`` may answer or cancel ``p``.
+
+        The prompt must be its session's. On the default session any attached
+        connection may answer (first answer wins), except a confirmation: that
+        stays with the invoking principal, from any of its connections.
+        """
+        if p.session_id != session.id:
+            return False
+        if session.default and p.kind != "confirm":
+            return True
+        return p.principal_key == a.principal.key
+
+    def answer(self, session: Session, a: Attachment, frame: dict[str, Any]) -> None:
         """Raises InvokeRefused for a bad answer; the prompt stays open then."""
         p = self.prompts.get(frame["prompt_id"])
         if p is None or p.future.done():
-            raise InvokeRefused("NOT_FOUND", "unknown or closed prompt")
-        if p.session_id != session.id or p.principal_key != session.principal.key:
+            raise InvokeRefused("NOT_FOUND", "unknown or already answered prompt")
+        if p.session_id != session.id:
             raise InvokeRefused("FORBIDDEN", "this prompt belongs to another session")
+        if not self.may_answer(session, a, p):
+            raise InvokeRefused("FORBIDDEN", "this confirmation belongs to the principal that invoked it")
         if frame.get("cancel"):
             p.future.set_exception(PromptCancelled("cancelled"))
             return
@@ -411,10 +437,19 @@ class JobManager:
                 raise InvokeRefused("BAD_REQUEST", err or "invalid")
         p.future.set_result(value)
 
-    def cancel_prompt(self, session: "Session", pid: str) -> None:
+    def cancel_prompt(self, session: Session, a: Attachment, pid: str) -> None:
         p = self.prompts.get(pid)
-        if p and p.session_id == session.id and not p.future.done():
-            p.future.set_exception(PromptCancelled("cancelled"))
+        if p is None or p.future.done() or p.session_id != session.id:
+            return
+        if not self.may_answer(session, a, p):
+            raise InvokeRefused("FORBIDDEN", "this confirmation belongs to the principal that invoked it")
+        p.future.set_exception(PromptCancelled("cancelled"))
+
+    def abort_prompt(self, pid: str, reason: str) -> None:
+        """Service-side cancel (session ended, invoker left)."""
+        p = self.prompts.get(pid)
+        if p is not None and not p.future.done():
+            p.future.set_exception(PromptCancelled(reason))
 
     async def _collect_params(self, job: Job) -> dict[str, Any]:
         params = dict(job.params)
@@ -571,7 +606,8 @@ class JobManager:
 
     # ------------------------------------------------------------------ cancel, page, cleanup
 
-    def cancel(self, session: "Session", job_id: str, msg_id: str | None) -> None:
+    def cancel(self, session: Session, job_id: str, msg_id: str | None, a: Attachment | None = None) -> None:
+        """Detach ``session`` from the job. On the default session that detaches the shared screen."""
         job = self.jobs.get(job_id)
         if job is None or session.id not in job.attached:
             raise InvokeRefused("NOT_FOUND", f"no job {job_id} attached to this session")
@@ -582,7 +618,7 @@ class JobManager:
             f["state"] = "cancelled"
             for k in ("result", "error", "progress", "cached_at"):
                 f.pop(k, None)
-            session.send(f)
+            session.send(f, reply_to=a)
         for pid in list(job.prompts):
             p = self.prompts.get(pid)
             if p and p.session_id == session.id and not p.future.done():
@@ -592,23 +628,23 @@ class JobManager:
         if self.on_change:
             self.on_change()
 
-    def detach_all(self, session: "Session") -> None:
+    def detach_all(self, session: Session) -> None:
         for job_id in list(session.jobs):
             try:
                 self.cancel(session, job_id, None)
             except InvokeRefused:
                 pass
 
-    def page(self, session: "Session", job_id: str, cursor: str, msg_id: str) -> None:
+    def page(self, session: Session, a: Attachment, job_id: str, cursor: str, msg_id: str) -> None:
         job = self.jobs.get(job_id)
         decoded = decode_cursor(cursor)
         if job is None or session.id not in job.attached:
             raise InvokeRefused("NOT_FOUND", f"no job {job_id} attached to this session")
         if job.state != "result" or decoded is None or decoded[0] != job_id or not 0 <= decoded[1] < len(job.pages):
             raise InvokeRefused("NOT_FOUND", "unknown cursor")
-        session.send(self.job_frame(job, msg_id, decoded[1]))
+        a.send(self.job_frame(job, msg_id, decoded[1]))
 
-    def live_jobs_for(self, session: "Session") -> list[Job]:
+    def live_jobs_for(self, session: Session) -> list[Job]:
         return [self.jobs[j] for j in session.jobs if j in self.jobs]
 
     def summary(self) -> list[dict[str, Any]]:

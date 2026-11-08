@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "type": "view",
+  "id": "s:42",
+  "screen": "prompt",
+  "node": "system.reboot",
+  "title": "Reboot",
+  "job_id": "j8Qx2",
+  "answerable": false,
+  "blocks": [
+    {
+      "type": "confirm",
+      "prompt_id": "p91c3",
+      "message": "Reboot the WLAN Pi now?",
+      "confirm_label": "Reboot",
+      "cancel_label": "Cancel",
+      "selected": "cancel",
+      "text": "Reboot the WLAN Pi now?\n[Cancel] Reboot"
+    }
+  ],
+  "hints": {},
+  "driven_by": {
+    "principal": {
+      "kind": "local",
+      "name": "wlanpi",
+      "uid": 1000,
+      "did": "wlanpi-menud"
+    },
+    "surface": "wlanpi-menu-tui",
+    "self": false
+  }
+}

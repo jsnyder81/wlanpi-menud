@@ -26,7 +26,7 @@ from .loader import LoadResult, load_menu
 from .menu import DeviceContext, Menu, RouteTable
 from .nav import NavContext, PromptState, handle_input, normalize, path_to
 from .outqueue import OutQueue
-from .session import Session
+from .session import DEFAULT, NEW, Attachment, Session
 from .topics import TopicHub, topic_matches
 from .views import render_view
 
@@ -51,6 +51,9 @@ class Service:
         self.jobs = JobManager(self)
         self.jobs.on_change = self._publish_jobs
         self.sessions: dict[str, Session] = {}
+        # The default session exists from start and never ends; the panel wakes up to it.
+        self.default_session = Session(DEFAULT, "thin", validate=self.validator())
+        self.sessions[self.default_session.id] = self.default_session
         self.tokens = tokens or TokenSource(config.token_command, config.token_refresh_margin_sec)
         self.core = core or CoreClient(config.core_base_url, self.tokens, prefix=config.core_api_prefix,
                                        cert=config.core_cert, timeout=config.core_timeout_sec,
@@ -103,27 +106,33 @@ class Service:
         self.routes = routes
         self.set_context(replace(self.ctx, core_routes=routes))
 
-    def menu_frame(self, session: Session, msg_id: str) -> dict[str, Any]:
+    def menu_frame(self, a: Attachment, msg_id: str) -> dict[str, Any]:
         f: dict[str, Any] = {"v": 1, "type": "menu", "id": msg_id, "revision": self.menu_revision,
-                             "nodes": session.menu_view.to_frame_nodes(self.menu.plugin_of)}
+                             "nodes": a.menu_view.to_frame_nodes(self.menu.plugin_of)}
         if self.ctx.mode:
             f["device_mode"] = self.ctx.mode
         return f
 
-    def _recompute(self, session: Session) -> bool:
-        before = set(session.menu_view.nodes)
-        session.menu_view = self.menu.view(self.ctx, session.principal.roles)
-        return set(session.menu_view.nodes) != before
+    def _recompute(self, a: Attachment) -> bool:
+        before = set(a.menu_view.nodes)
+        a.menu_view = self.menu.view(self.ctx, a.principal.roles)
+        return set(a.menu_view.nodes) != before
+
+    def _nav_view(self, session: Session) -> None:
+        """The tree the shared cursor moves in: the roles of whoever drove it last."""
+        roles = session.driver.principal.roles if session.driver else \
+            (session.attachments[0].principal.roles if session.attachments else ("admin",))
+        session.menu_view = self.menu.view(self.ctx, roles)
 
     def refresh_menus(self, force: bool = False) -> None:
         for s in list(self.sessions.values()):
-            changed = self._recompute(s)
-            if not s.connected:
-                continue
-            if changed or force:
-                s.send(self.menu_frame(s, s.next_id()))
-                s.menu_revision_sent = self.menu_revision
+            for a in list(s.attachments):
+                changed = self._recompute(a)
+                if changed or force:
+                    a.send(self.menu_frame(a, a.next_id()))
+                    a.menu_revision_sent = self.menu_revision
             if s.thin:
+                self._nav_view(s)
                 s.cursor = normalize(s.cursor, s.menu_view)
                 self.push_view(s)
 
@@ -139,23 +148,25 @@ class Service:
                 raise AssertionError(f"outbound {frame.get('type')} frame breaks frames.schema.json: {errs}")
         return check
 
-    def push_view(self, session: Session, msg_id: str | None = None) -> None:
-        if not session.thin or not session.connected:
+    def push_view(self, session: Session, msg_id: str | None = None, reply_to: Attachment | None = None) -> None:
+        """Render the session's screen for every attachment. ``reply_to`` gets it with ``msg_id``."""
+        if not session.thin:
             return
-        frame = render_view(session, msg_id or session.next_id(), self.jobs, self.hub.data)
-        session.send(frame, coalesce=None if msg_id else "view")
+        for a in list(session.attachments):
+            reply = msg_id is not None and (reply_to is None or a is reply_to)
+            frame = render_view(session, a, msg_id if reply else a.next_id(), self.jobs, self.hub.data)
+            a.send(frame, coalesce=None if reply else "view")
 
     def _on_publish(self, topic: str, seq: int, data: Any) -> None:
         for s in list(self.sessions.values()):
-            if not s.connected:
-                continue
-            if any(topic_matches(sub, topic) for sub in s.subscriptions):
-                s.send_event(self.hub.event(s.next_id(), topic, snapshot=False), topic)
-            if s.thin and s.cursor.screen == "home" and topic in HOME_TOPICS:
+            for a in list(s.attachments):
+                if any(topic_matches(sub, topic) for sub in a.subscriptions):
+                    a.send_event(self.hub.event(a.next_id(), topic, snapshot=False), topic)
+            if s.thin and s.connected and s.cursor.screen == "home" and topic in HOME_TOPICS:
                 self.push_view(s)
 
-    def resnapshot(self, session: Session, topics: set[str]) -> list[dict[str, Any]]:
-        return [self.hub.event(session.next_id(), t, snapshot=True) for t in sorted(topics) if t in self.hub.data]
+    def resnapshot(self, a: Attachment, topics: set[str]) -> list[dict[str, Any]]:
+        return [self.hub.event(a.next_id(), t, snapshot=True) for t in sorted(topics) if t in self.hub.data]
 
     def _publish_jobs(self) -> None:
         self.hub.publish("jobs", self.jobs.summary())
@@ -191,145 +202,206 @@ class Service:
     # ------------------------------------------------------------------ sessions
 
     def sessions_on(self, socket_kind: str) -> int:
-        return sum(1 for s in self.sessions.values() if s.connected and s.socket_kind == socket_kind)
+        """Connections on a socket (the per-socket limit counts connections, not sessions)."""
+        return sum(1 for s in self.sessions.values() for a in s.attachments if a.socket_kind == socket_kind)
 
     def hello(self, principal: Principal, frame: dict[str, Any], socket_kind: str,
-              queue_factory, closer) -> tuple[Session, list[dict[str, Any]]]:
-        """Handle a valid hello. Returns the session and the frames to send, in order."""
+              queue_factory, closer) -> tuple[Attachment, list[dict[str, Any]]]:
+        """Handle a valid hello. Returns the new attachment and the frames to send, in order."""
         common = sorted(set(frame["protocol"]) & set(protocol.SUPPORTED))
         if not common:
             raise ProtocolViolation(protocol.error(frame["id"], "VERSION", "no common protocol version",
                                                    supported=list(protocol.SUPPORTED)))
         version = common[-1]
+        mode = frame["mode"]
+        kind = frame.get("session") or (DEFAULT if mode == "thin" else NEW)
+        if kind == DEFAULT and mode != "thin":
+            raise ProtocolViolation(protocol.error(
+                frame["id"], "BAD_REQUEST", "the default session is thin: rich clients navigate locally "
+                "(send session: new, or mode: thin to mirror the default screen)", close_code=4400))
         resume = frame.get("resume") or {}
-        session = None
+        same_epoch = resume.get("epoch") == self.epoch
+        prior = self.sessions.get(resume.get("session_id", "")) if same_epoch else None
         resumed = False
-        prior = self.sessions.get(resume.get("session_id", "")) if resume.get("epoch") == self.epoch else None
-        if prior is not None and prior.principal.key == principal.key and prior.mode == frame["mode"] \
-                and prior.socket_kind == socket_kind:
-            if prior.connected:
-                prior.close(1000, "replaced by a resumed connection")
-                prior.detach()
-            session = prior
-            session.principal = principal  # fresh credentials (for example a re-checked JWT)
-            seqs = resume.get("seq", {})
-            resumed = all(self.hub.seq.get(t) == seqs.get(t) for t in session.subscriptions) and \
-                all(self.hub.seq.get(t) == n for t, n in seqs.items())
-        if session is None:
-            session = Session(principal, frame["mode"], socket_kind, client=frame.get("client"),
-                              capabilities=frame.get("capabilities"), validate=self.validator())
-            self.sessions[session.id] = session
-        session.attach(queue_factory(session), closer)
-        self._recompute(session)
+        subs: set[str] = set()
+        seqs: dict[str, int] = resume.get("seq", {})
+        if kind == DEFAULT:
+            session = self.default_session
+            if prior is session:
+                # The cursor lives in the service; what resumes is this surface's topic stream.
+                subs = set(seqs)
+                resumed = all(self.hub.seq.get(t) == n for t, n in seqs.items())
+        else:
+            session = None
+            if prior is not None and not prior.default and prior.owner_key == principal.key \
+                    and prior.mode == mode and prior.socket_kind == socket_kind:
+                for old in list(prior.attachments):
+                    old.close(1000, "replaced by a resumed connection")
+                    self._detach(old)
+                session = prior
+                subs = set(prior.saved_subscriptions)
+                resumed = all(self.hub.seq.get(t) == seqs.get(t) for t in subs) and \
+                    all(self.hub.seq.get(t) == n for t, n in seqs.items())
+            if session is None:
+                session = Session(NEW, mode, validate=self.validator(), owner_key=principal.key,
+                                  socket_kind=socket_kind)
+                self.sessions[session.id] = session
+        a = Attachment(session, principal, socket_kind, client=frame.get("client"),
+                       capabilities=frame.get("capabilities"), validate=self.validator())
+        a.subscriptions = subs
+        a.open(queue_factory(a), closer)
+        session.attach(a)
+        self._recompute(a)
         if session.thin:
+            self._nav_view(session)
             session.cursor = normalize(session.cursor, session.menu_view)
 
-        welcome = {"v": 1, "type": "welcome", "id": frame["id"], "session_id": session.id, "epoch": self.epoch,
-                   "principal": principal.frame(), "roles": list(principal.roles), "version": version,
-                   "mode": session.mode, "resumed": resumed,
+        welcome = {"v": 1, "type": "welcome", "id": frame["id"], "session_id": session.id, "session": session.kind,
+                   "epoch": self.epoch, "principal": principal.frame(), "roles": list(principal.roles),
+                   "version": version, "mode": session.mode, "resumed": resumed,
                    "limits": {"queue_frames": self.config.queue_frames, "max_frame_bytes": self.config.max_frame_bytes}}
         out = [welcome]
         if not resumed or resume.get("menu_revision") != self.menu_revision:
-            out.append(self.menu_frame(session, session.next_id()))
-            session.menu_revision_sent = self.menu_revision
+            out.append(self.menu_frame(a, a.next_id()))
+            a.menu_revision_sent = self.menu_revision
         if not resumed:
-            for sub in sorted(session.subscriptions):
+            for sub in sorted(a.subscriptions):
                 for t in self.hub.topics_for(sub):
-                    out.append(self.hub.event(session.next_id(), t, snapshot=True))
+                    out.append(self.hub.event(a.next_id(), t, snapshot=True))
             for job in self.jobs.live_jobs_for(session):
-                out.append(self.jobs.job_frame(job, session.next_id()))
+                out.append(self.jobs.job_frame(job, a.next_id()))
             for p in self.jobs.prompts.values():
                 if p.session_id == session.id:
-                    out.append(dict(p.frame, id=session.next_id()))
+                    out.append(dict(p.frame, id=a.next_id()))
         if session.thin:
-            out.append(render_view(session, session.next_id(), self.jobs, self.hub.data))
-        log.info("session %s %s (%s %s, %s) on %s", session.id, "resumed" if resumed else "started",
-                 principal.kind, principal.name, session.mode, socket_kind)
-        return session, out
+            out.append(render_view(session, a, a.next_id(), self.jobs, self.hub.data))
+        log.info("%s %s session %s (%s %s, %s) on %s; %d attached", "resumed" if resumed else "attached",
+                 session.kind, session.id, principal.kind, principal.name, session.mode, socket_kind,
+                 len(session.attachments))
+        return a, out
 
-    def disconnected(self, session: Session, queue: OutQueue) -> None:
-        if session.queue is queue:  # a resumed connection may already own the session
-            session.detach()
+    def disconnected(self, a: Attachment, queue: OutQueue) -> None:
+        if a.queue is queue:  # a resumed connection may already have replaced it
+            self._detach(a)
+
+    def _detach(self, a: Attachment) -> None:
+        session = a.session
+        session.detach(a)
+        if session.default:
+            # A confirmation only its invoker can answer must not strand the
+            # shared screen once no connection of that principal is left.
+            keys = session.principal_keys()
+            for p in list(self.jobs.prompts.values()):
+                if p.session_id == session.id and p.kind == "confirm" and p.principal_key not in keys:
+                    self.jobs.abort_prompt(p.id, "invoker detached")
 
     def expire_sessions(self) -> None:
         now = time.time()
         for s in list(self.sessions.values()):
-            if not s.connected and s.detached_at is not None and now - s.detached_at > self.config.resume_grace_sec:
+            if s.default or s.connected or s.detached_at is None:
+                continue
+            if now - s.detached_at > self.config.resume_grace_sec:
                 self.drop_session(s)
 
     def drop_session(self, s: Session) -> None:
+        if s.default:
+            return  # the default session never ends
         self.jobs.detach_all(s)
         for p in list(self.jobs.prompts.values()):
             if p.session_id == s.id:
-                self.jobs.cancel_prompt(s, p.id)
+                self.jobs.abort_prompt(p.id, "session ended")
         self.sessions.pop(s.id, None)
 
     def revoke_principal(self, key: str, reason: str) -> int:
         n = 0
         for s in list(self.sessions.values()):
-            if s.principal.key == key:
-                self._revoke(s, reason)
-                n += 1
+            for a in list(s.attachments):
+                if a.principal.key == key:
+                    self.revoke_attachment(a, reason)
+                    n += 1
+            if not s.default and s.owner_key == key and s.id in self.sessions:
+                self.drop_session(s)
         return n
 
     def revoke_webui_session(self, webui_session: str) -> int:
-        """WebUI logout: close every session carrying that WebUI session id (close 4401)."""
+        """WebUI logout: close every connection carrying that WebUI session id (close 4401)."""
         n = 0
         for s in list(self.sessions.values()):
-            if s.principal.kind == "webui" and s.principal.webui_session == webui_session:
-                self._revoke(s, "WebUI session ended")
-                n += 1
+            for a in list(s.attachments):
+                if a.principal.kind == "webui" and a.principal.webui_session == webui_session:
+                    self.revoke_attachment(a, "WebUI session ended")
+                    n += 1
         return n
 
-    def _revoke(self, s: Session, reason: str) -> None:
-        if s.connected:
-            s.send(protocol.error(s.next_id(), "AUTH_FAILED", reason))
-            s.close(4401, reason)
-        self.drop_session(s)
+    def revoke_attachment(self, a: Attachment, reason: str) -> None:
+        """Close one connection 4401. Its independent session ends with it; the default session stays."""
+        # The connection detaches itself once the writer has flushed the error and closed.
+        if a.connected:
+            a.send(protocol.error(a.next_id(), "AUTH_FAILED", reason))
+            a.close(4401, reason)
+        else:
+            self._detach(a)
+        if not a.session.default:
+            self.drop_session(a.session)
 
-    # ------------------------------------------------------------------ frames from a session
+    # ------------------------------------------------------------------ frames from a connection
 
-    def _refuse(self, session: Session, msg_id: str, exc: InvokeRefused) -> None:
+    def _refuse(self, a: Attachment, msg_id: str, exc: InvokeRefused) -> None:
         extra = {"core_status": exc.core_status} if exc.core_status else {}
-        session.send(protocol.error(msg_id, exc.code, exc.message, **extra))
+        a.send(protocol.error(msg_id, exc.code, exc.message, **extra))
 
-    def handle_frame(self, session: Session, frame: dict[str, Any]) -> None:
+    def handle_frame(self, a: Attachment, frame: dict[str, Any]) -> None:
         t, mid = frame["type"], frame["id"]
+        session = a.session
         try:
             if t == "subscribe":
                 for sub in frame["topics"]:
-                    if sub in session.subscriptions:
+                    if sub in a.subscriptions:
                         continue
-                    session.subscriptions.add(sub)
+                    a.subscriptions.add(sub)
                     for topic in self.hub.topics_for(sub):
-                        session.send(self.hub.event(mid, topic, snapshot=True))
+                        a.send(self.hub.event(mid, topic, snapshot=True))
             elif t == "unsubscribe":
-                session.subscriptions.difference_update(frame["topics"])
+                a.subscriptions.difference_update(frame["topics"])
             elif t == "input":
                 if not session.thin:
                     raise InvokeRefused("BAD_REQUEST", "input is for thin sessions; rich sessions send invoke")
-                self._input(session, frame)
+                self._input(a, frame)
             elif t == "invoke":
-                job = self.jobs.invoke(session, frame["node"], frame.get("params"), frame.get("confirmed", False), mid)
                 if session.thin:
-                    where = path_to(frame["node"], session.menu_view)
+                    self._guard_confirm(a)
+                job = self.jobs.invoke(session, a, frame["node"], frame.get("params"), frame.get("confirmed", False),
+                                       mid)
+                if session.thin:
+                    session.drove(a)
+                    where = path_to(frame["node"], a.menu_view)
                     if where:
                         session.cursor = replace(session.cursor, screen="result", stack=where[0], index=where[1],
                                                  node=frame["node"], job_id=job.id, page=0)
                     self.push_view(session)
             elif t == "answer":
-                self.jobs.answer(session, frame)
+                self.jobs.answer(session, a, frame)
+                session.drove(a)
             elif t == "page":
-                self.jobs.page(session, frame["job_id"], frame["cursor"], mid)
+                self.jobs.page(session, a, frame["job_id"], frame["cursor"], mid)
             elif t == "cancel":
-                self.jobs.cancel(session, frame["job_id"], mid)
+                self.jobs.cancel(session, frame["job_id"], mid, a)
                 if session.thin and session.cursor.job_id == frame["job_id"]:
+                    session.drove(a)
                     session.cursor = replace(session.cursor, screen="menu", job_id=None, node=None)
                     self.push_view(session)
             elif t in ("hello", "auth"):
                 raise InvokeRefused("BAD_REQUEST", f"{t} is only valid once, at the start")
         except InvokeRefused as exc:
-            self._refuse(session, mid, exc)
+            self._refuse(a, mid, exc)
+
+    def _guard_confirm(self, a: Attachment) -> None:
+        """On a shared screen, a confirmation belongs to the principal that invoked it:
+        nobody else answers it, cancels it or navigates away from it."""
+        c = a.session.cursor
+        p = self.jobs.prompts.get(c.prompt_id) if c.screen == "prompt" and c.prompt_id else None
+        if p is not None and not self.jobs.may_answer(a.session, a, p):
+            raise InvokeRefused("FORBIDDEN", "this confirmation belongs to the principal that invoked it")
 
     def _nav_context(self, session: Session) -> NavContext:
         c = session.cursor
@@ -342,14 +414,25 @@ class Service:
         return NavContext(session.menu_view, page_count=max(len(job.pages), 1) if job else 1,
                           job_running=bool(job and job.live), prompt=prompt)
 
-    def _input(self, session: Session, frame: dict[str, Any]) -> None:
+    def _input(self, a: Attachment, frame: dict[str, Any]) -> None:
         mid = frame["id"]
+        session = a.session
+        try:
+            self._guard_confirm(a)
+        except InvokeRefused as exc:
+            self._refuse(a, mid, exc)
+            self.push_view(session, mid, reply_to=a)
+            return
+        # Last write wins: this connection drives, in the tree its principal sees.
+        session.drove(a)
+        session.menu_view = a.menu_view
+        session.cursor = normalize(session.cursor, a.menu_view)
         result = handle_input(session.cursor, frame["key"], self._nav_context(session))
         session.cursor = result.cursor
         for eff in result.effects:
             try:
                 if eff.kind == "invoke":
-                    job = self.jobs.invoke(session, eff.node, None, False, session.next_id())
+                    job = self.jobs.invoke(session, a, eff.node, None, False, a.next_id())
                     session.cursor = replace(session.cursor, job_id=job.id)
                 elif eff.kind == "answer":
                     p = self.jobs.prompts.get(eff.prompt_id)
@@ -357,18 +440,18 @@ class Service:
                         continue
                     value = p.values[eff.value] if p.kind == "select" else eff.value
                     if p.kind == "confirm":
-                        self.jobs.answer(session, {"prompt_id": p.id, "confirmed": bool(value)})
+                        self.jobs.answer(session, a, {"prompt_id": p.id, "confirmed": bool(value)})
                     else:
-                        self.jobs.answer(session, {"prompt_id": p.id, "value": value})
+                        self.jobs.answer(session, a, {"prompt_id": p.id, "value": value})
                 elif eff.kind == "cancel_prompt":
-                    self.jobs.cancel_prompt(session, eff.prompt_id)
+                    self.jobs.cancel_prompt(session, a, eff.prompt_id)
                 elif eff.kind == "detach" and eff.job_id:
-                    self.jobs.cancel(session, eff.job_id, None)
+                    self.jobs.cancel(session, eff.job_id, None, a)
             except InvokeRefused as exc:
-                self._refuse(session, mid, exc)
+                self._refuse(a, mid, exc)
                 if eff.kind == "invoke":
                     session.cursor = replace(session.cursor, screen="menu", job_id=None)
-        self.push_view(session, mid)
+        self.push_view(session, mid, reply_to=a)
 
     # ------------------------------------------------------------------ complications (provider publish)
 
@@ -390,11 +473,10 @@ class Service:
 
     async def aclose(self) -> None:
         for s in list(self.sessions.values()):
-            if s.connected:
-                s.close(1001, "service stopping")
+            s.close(1001, "service stopping")
         await self.jobs.shutdown()
         await self.core.aclose()
 
-    def new_queue(self, session: Session) -> OutQueue:
+    def new_queue(self, a: Attachment) -> OutQueue:
         return OutQueue(self.config.queue_frames, self.config.queue_bytes,
-                        resnapshot=lambda topics: self.resnapshot(session, topics))
+                        resnapshot=lambda topics: self.resnapshot(a, topics))

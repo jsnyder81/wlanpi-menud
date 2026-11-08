@@ -1,0 +1,52 @@
+{
+  "v": 1,
+  "type": "view",
+  "id": "s:41",
+  "screen": "menu",
+  "node": "network",
+  "title": "Network",
+  "breadcrumb": [
+    "Network"
+  ],
+  "blocks": [
+    {
+      "type": "list",
+      "selected": 1,
+      "text": "  Interfaces\n> WLAN Interfaces\n  Eth0 IP Config\n  Eth0 VLAN",
+      "items": [
+        {
+          "label": "Interfaces",
+          "node": "network.interfaces"
+        },
+        {
+          "label": "WLAN Interfaces",
+          "node": "network.wlan_interfaces"
+        },
+        {
+          "label": "Eth0 IP Config",
+          "node": "network.eth0_ipconfig"
+        },
+        {
+          "label": "Eth0 VLAN",
+          "node": "network.eth0_vlan"
+        }
+      ]
+    }
+  ],
+  "page": {
+    "index": 0,
+    "count": 2,
+    "more": true
+  },
+  "hints": {
+    "left": "Back",
+    "center": "Open"
+  },
+  "driven_by": {
+    "principal": {
+      "kind": "webui",
+      "name": "wlanpi",
+      "did": "wlanpi-menud"
+    }
+  }
+}

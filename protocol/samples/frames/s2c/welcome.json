@@ -3,6 +3,7 @@
   "type": "welcome",
   "id": "c1",
   "session_id": "s-7f2a",
+  "session": "new",
   "epoch": "k3Jd9QpA2mVx",
   "principal": {
     "kind": "local",

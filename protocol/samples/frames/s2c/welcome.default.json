@@ -1,0 +1,24 @@
+{
+  "v": 1,
+  "type": "welcome",
+  "id": "c1",
+  "session_id": "Sx3K9mQ2aZpT",
+  "session": "default",
+  "epoch": "k3Jd9QpA2mVx",
+  "principal": {
+    "kind": "local",
+    "name": "wlanpi",
+    "uid": 1000,
+    "did": "wlanpi-menud"
+  },
+  "roles": [
+    "operator"
+  ],
+  "version": 1,
+  "mode": "thin",
+  "resumed": false,
+  "limits": {
+    "queue_frames": 64,
+    "max_frame_bytes": 262144
+  }
+}

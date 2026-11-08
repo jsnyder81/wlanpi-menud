@@ -13,11 +13,11 @@ to wlanpi-core. See `FPMS Re-Architecture Plan.md` for the design and
 | `protocol/` | Contract: `menu.schema.json`, `frames.schema.json`, `PROTOCOL.md`, samples and their tests |
 | `share/menu.d/` | Built-in menu manifests (installed to `/usr/share/wlanpi-menud/menu.d/`) |
 | `wlanpi_menud/loader.py`, `manifest.py`, `menu.py` | Manifest validation and loading, per-session visibility |
-| `wlanpi_menud/nav.py` | Pure thin-mode navigator; one `Cursor` per session |
+| `wlanpi_menud/nav.py` | Pure thin-mode navigator; one `Cursor` per session (the default session's is shared by every attached connection) |
 | `wlanpi_menud/jobs.py` | Jobs: sharing and caching, prompts, confirmations, cancel, paging, core error mapping |
 | `wlanpi_menud/handlers/` | First-party Python handlers, registered by dotted name |
 | `wlanpi_menud/core/` | Core client: `generated.py` (from core's `docs/openapi.json`), HTTPS transport with a pinned cert, service token |
-| `wlanpi_menud/server.py`, `service.py`, `session.py`, `outqueue.py`, `topics.py`, `views.py` | Sockets, auth, sessions, bounded queues, topics, thin views |
+| `wlanpi_menud/server.py`, `service.py`, `session.py`, `outqueue.py`, `topics.py`, `views.py` | Sockets, auth, the default session and independent sessions (attachments, fan-out), bounded queues, topics, thin views |
 | `wlanpi_menud/poller.py` | The one polling loop (publishes only on change) |
 | `install/` | Root token helper, sudoers entry, systemd unit, example config (installed by `debian/`) |
 | `debian/`, `build-package-native.sh`, `Dockerfile.build` | Debian packaging (dh-virtualenv) and the container build |

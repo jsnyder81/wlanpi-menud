@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Demo: two thin clients on one wlanpi-menud, navigating independently.
 
+Both ask for independent sessions (``hello.session: "new"``); without it a
+thin client attaches to the shared default session and they would mirror.
+
 Starts the real service and server on temporary unix sockets against the
 fake core used by the tests, connects two thin clients (as a TUI would) over
 local.sock, interleaves their button presses, and prints what each screen
@@ -98,11 +101,11 @@ async def main() -> None:
     for name in ("A", "B"):
         ws = await unix_connect(str(config.local_sock), uri="ws://localhost/ui/ws")
         c = ThinClient(name, ws)
-        await c.send("hello", mode="thin", protocol=[1], client={"name": f"demo-tui-{name}"},
+        await c.send("hello", mode="thin", session="new", protocol=[1], client={"name": f"demo-tui-{name}"},
                      capabilities={"screen": {"cols": 16, "rows": 8}, "blocks": ["text", "kv", "list", "table"]})
         w = await c.until(lambda f: f["type"] == "welcome")
         home = await c.until(lambda f: f["type"] == "view")
-        print(f"{name}: session {w['session_id']} as {w['principal']['kind']} uid {w['principal']['uid']} "
+        print(f"{name}: {w['session']} session {w['session_id']} as {w['principal']['kind']} uid {w['principal']['uid']} "
               f"roles {w['roles']}")
         for ln in screen_text(home):
             print(f"  {name} | {ln}")
@@ -133,7 +136,8 @@ async def main() -> None:
             print(f"  {name} | {ln}")
     print()
     for name in clients:
-        s = next(s for s in service.sessions.values() if s.client.get("name") == f"demo-tui-{name}")
+        s = next(s for s in service.sessions.values()
+                 if any(a.client.get("name") == f"demo-tui-{name}" for a in s.attachments))
         print(f"{name} cursor: screen={s.cursor.screen} stack={list(s.cursor.stack)} index={s.cursor.index} "
               f"node={s.cursor.node} page={s.cursor.page}")
     print(f"core calls: LLDP/network info x{fake.calls['GET /network/info/']}, "

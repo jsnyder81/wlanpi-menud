@@ -1,14 +1,14 @@
-wlanpi-menud epoch 0zdGanehNmZbAGGd; sockets in /tmp/menud-demo-68s78gth
+wlanpi-menud epoch a6x94jDWUH54l2tm; sockets in /tmp/menud-demo-b75fzy6p
 menu: 76 nodes registered, 0 files rejected
 
-A: session SRmDsCl3xFGy86NV2 as local uid 1000 roles ['admin']
+A: new session S9Z_l_j6jDku7W64o as local uid 1000 roles ['admin']
   A | [home] WLAN Pi
   A |     Host: wlanpi-test
   A |     Mode: classic
   A |     IP: 192.0.2.10
   A |     Model: R4
   A |     Temp: 48.0C
-B: session SxVrd_151Y_k1JTrX as local uid 1000 roles ['admin']
+B: new session ShbQaWgzzVwnlRkrn as local uid 1000 roles ['admin']
   B | [home] WLAN Pi
   B |     Host: wlanpi-test
   B |     Mode: classic

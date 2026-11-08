@@ -116,8 +116,8 @@ def test_normalize_after_menu_change():
 
 async def test_two_thin_sessions_navigate_independently(harness):
     a, b = await harness.connect(), await harness.connect()
-    wa, wb = await a.hello(), await b.hello()
-    assert wa["session_id"] != wb["session_id"]
+    wa, wb = await a.hello(session="new"), await b.hello(session="new")
+    assert wa["session_id"] != wb["session_id"] and wa["session"] == wb["session"] == "new"
     for c in (a, b):
         await c.expect(type="view")
 

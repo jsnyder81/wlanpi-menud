@@ -3,9 +3,10 @@
 ``handle_input(cursor, key, ctx) -> NavResult`` takes one session's cursor,
 a button and what the session can currently see, and returns the new
 cursor plus at most one effect for the session layer to carry out. It has
-no side effects and holds no global state: every thin session owns its own
-``Cursor``, so two sessions never share a position (the PoC kept one
-global ``NavLocation``).
+no side effects and holds no global state: every session owns its own
+``Cursor`` (the PoC kept one global ``NavLocation``). Connections attached
+to the default session share that session's cursor; independent sessions
+never share a position.
 
 The cursor addresses the menu by node id (the stack of branches entered
 plus an index among the current branch's visible children), so it survives

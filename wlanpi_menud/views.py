@@ -1,15 +1,21 @@
-"""Thin-mode ``view`` frames: the session's current screen as view blocks."""
+"""Thin-mode ``view`` frames: the session's current screen as view blocks.
+
+A view is rendered per attachment: each connection sees the shared cursor
+through its own principal's menu visibility, and on the default session the
+view names who drove it (``driven_by``) and whether this connection may
+answer an open prompt (``answerable``).
+"""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
 from . import blocks as B
-from .nav import selected_node
+from .nav import normalize, selected_node
 
 if TYPE_CHECKING:
     from .jobs import Job, JobManager, Prompt
-    from .session import Session
+    from .session import Attachment, Session
 
 HINTS = {
     "home": {"down": "Menu"},
@@ -38,20 +44,21 @@ def home_blocks(summary: dict[str, Any], alerts: list[Any], complications: list[
     return "home", out or [B.text("WLAN Pi")]
 
 
-def prompt_blocks(p: "Prompt", session: "Session") -> list[dict[str, Any]]:
+def prompt_blocks(p: Prompt, session: Session, c: Any = None) -> list[dict[str, Any]]:
     f = p.frame
+    c = c or session.cursor
     out: list[dict[str, Any]] = []
     if f.get("message") and p.kind != "confirm":
         out.append(B.text(f["message"]))
     if p.kind == "select":
         out.append(B.list_block([{"label": o["label"], "detail": o.get("detail")} for o in f["options"]],
-                                selected=min(session.cursor.prompt_index, max(len(f["options"]) - 1, 0))))
+                                selected=min(c.prompt_index, max(len(f["options"]) - 1, 0))))
     elif p.kind == "confirm":
         out.append(B.confirm(p.id, f.get("message") or f["title"], f.get("confirm_label", "Confirm"),
                              f.get("cancel_label", "Cancel"),
-                             selected="confirm" if session.cursor.prompt_index == 1 else "cancel"))
+                             selected="confirm" if c.prompt_index == 1 else "cancel"))
     elif p.kind == "integer":
-        value = session.cursor.prompt_value
+        value = c.prompt_value
         if value is None:
             value = f.get("default", f.get("minimum", 0))
         out.append(B.text(f"{f['title']}: {value}", "heading"))
@@ -60,9 +67,11 @@ def prompt_blocks(p: "Prompt", session: "Session") -> list[dict[str, Any]]:
     return out
 
 
-def render_view(session: "Session", msg_id: str, jobs: "JobManager", hub_data: dict[str, Any]) -> dict[str, Any]:
-    c = session.cursor
-    menu = session.menu_view
+def render_view(session: Session, a: Attachment, msg_id: str, jobs: JobManager,
+                hub_data: dict[str, Any]) -> dict[str, Any]:
+    menu = a.menu_view
+    c = normalize(session.cursor, menu) if menu is not session.menu_view else session.cursor
+    answerable = True
     frame: dict[str, Any] = {"v": 1, "type": "view", "id": msg_id}
     if c.screen == "home":
         screen, blocks = home_blocks(hub_data.get("device.summary") or {}, hub_data.get("alerts") or [],
@@ -79,8 +88,9 @@ def render_view(session: "Session", msg_id: str, jobs: "JobManager", hub_data: d
                      if items else [B.text("Nothing here")])
     elif c.screen == "prompt" and c.prompt_id in jobs.prompts:
         p = jobs.prompts[c.prompt_id]
-        frame.update(screen="prompt", node=p.node, title=p.frame["title"], blocks=prompt_blocks(p, session),
-                     job_id=p.job_id)
+        answerable = jobs.may_answer(session, a, p)
+        frame.update(screen="prompt", node=p.node, title=p.frame["title"], blocks=prompt_blocks(p, session, c),
+                     job_id=p.job_id, answerable=answerable)
     else:  # result (or a prompt that just closed)
         job: Job | None = jobs.jobs.get(c.job_id) if c.job_id else None
         node = c.node
@@ -103,7 +113,12 @@ def render_view(session: "Session", msg_id: str, jobs: "JobManager", hub_data: d
         else:
             frame.update(screen="result", node=node, title=label[:64], job_id=job.id,
                          blocks=[B.status("info", "Cancelled")])
-    frame["hints"] = HINTS.get(frame["screen"], {})
+    frame["hints"] = HINTS.get(frame["screen"], {}) if answerable else {}
+    if session.default and session.driver is not None:
+        d = session.driver
+        frame["driven_by"] = {"principal": d.principal.frame(), "self": d.attachment_id == a.id}
+        if d.surface:
+            frame["driven_by"]["surface"] = d.surface[:64]
     if c.stack and "breadcrumb" not in frame:
         frame["breadcrumb"] = menu.breadcrumb(c.stack)
     return frame

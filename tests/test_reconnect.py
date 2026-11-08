@@ -176,7 +176,7 @@ async def test_slow_client_does_not_hold_up_others(harnesses, fake):
     await fast.hello("rich")
     await fast.send("subscribe", topics=["device.summary"])
     await fast.expect(type="event")
-    slow_session = h.service.sessions[ss["session_id"]]
+    slow_session = h.service.sessions[ss["session_id"]].attachments[0]
     # Simulate a stalled socket: stop draining the slow client's queue.
     slow_session.queue.get_nowait = lambda: None  # type: ignore[method-assign]
 

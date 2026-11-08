@@ -4,6 +4,12 @@
   "id": "c12",
   "prompt_id": "p91c3",
   "node": "system.reboot",
+  "invoked_by": {
+    "kind": "local",
+    "name": "wlanpi",
+    "uid": 1000,
+    "did": "wlanpi-menud"
+  },
   "kind": "confirm",
   "title": "Reboot",
   "message": "Reboot the WLAN Pi now?",

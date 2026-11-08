@@ -26,7 +26,7 @@ from . import protocol
 from .auth import Principal, origin_ok, peer_credentials, token_in_url
 from .outqueue import OutQueue, encode
 from .service import ProtocolViolation, Service
-from .session import Session
+from .session import Attachment
 
 log = logging.getLogger(__name__)
 audit = logging.getLogger("wlanpi_menud.audit")
@@ -125,7 +125,7 @@ class Server:
 
     async def _handle(self, ws: ServerConnection, kind: str) -> None:
         conn = Connection(ws)
-        session: Session | None = None
+        att: Attachment | None = None
         writer: asyncio.Task | None = None
         recheck: asyncio.Task | None = None
         try:
@@ -134,20 +134,20 @@ class Server:
                 await conn.fail(protocol.error("s:0", "INTERNAL", "session limit reached; retry later", close_code=1013))
             hello = await self._first_frame(conn, expect="hello")
             try:
-                session, frames = self.service.hello(
+                att, frames = self.service.hello(
                     principal, hello, kind, self.service.new_queue, conn.request_close)
             except ProtocolViolation as exc:
                 await conn.fail(exc.frame)
-            conn.queue = session.queue
+            conn.queue = att.queue
             for f in frames:
-                session.send(f)
-            writer = asyncio.create_task(conn.writer(), name=f"writer {session.id}")
+                att.send(f)
+            writer = asyncio.create_task(conn.writer(), name=f"writer {att.id}")
             if principal.kind == "jwt":
-                recheck = asyncio.create_task(self._recheck_jwt(session), name=f"jwt {session.id}")
+                recheck = asyncio.create_task(self._recheck_jwt(att), name=f"jwt {att.id}")
             async for raw in ws:
                 if conn.close_req:
                     break
-                self._dispatch(session, raw)
+                self._dispatch(att, raw)
         except (_Closing, ConnectionClosed):
             pass
         except Exception:
@@ -157,30 +157,30 @@ class Server:
         finally:
             if recheck:
                 recheck.cancel()
-            if session is not None and conn.queue is not None:
-                self.service.disconnected(session, conn.queue)
+            if att is not None and conn.queue is not None:
+                self.service.disconnected(att, conn.queue)
             if writer:
                 if conn.close_req and not writer.done():
                     with contextlib.suppress(Exception):
                         await asyncio.wait_for(writer, 2)
                 writer.cancel()
 
-    def _dispatch(self, session: Session, raw: str | bytes) -> None:
+    def _dispatch(self, att: Attachment, raw: str | bytes) -> None:
         try:
             frame = json.loads(raw)
         except (ValueError, UnicodeDecodeError):
-            session.send(protocol.error("s:bad", "BAD_REQUEST", "frame is not JSON"))
+            att.send(protocol.error("s:bad", "BAD_REQUEST", "frame is not JSON"))
             return
         errs = protocol.frame_errors(frame, protocol.C2S)
         if errs:
             mid = protocol.reply_id(frame, "s:bad")
-            session.send(protocol.error(mid, "BAD_REQUEST", "; ".join(errs)[:512]))
+            att.send(protocol.error(mid, "BAD_REQUEST", "; ".join(errs)[:512]))
             return
         try:
-            self.service.handle_frame(session, frame)
+            self.service.handle_frame(att, frame)
         except Exception:
             log.exception("frame handler failed for %s", frame.get("type"))
-            session.send(protocol.error(frame["id"], "INTERNAL", "internal error"))
+            att.send(protocol.error(frame["id"], "INTERNAL", "internal error"))
 
     async def _first_frame(self, conn: Connection, expect: str) -> dict[str, Any]:
         try:
@@ -242,18 +242,19 @@ class Server:
         return Principal("jwt", res.did or "jwt", tuple(self.config.jwt_roles), did=res.did,
                          token=frame["token"], token_exp=res.exp)
 
-    async def _recheck_jwt(self, session: Session) -> None:
+    async def _recheck_jwt(self, att: Attachment) -> None:
         """Re-check a remote JWT once its cached answer runs out (at most 60 s, or at exp)."""
         intro = self.service.introspector
-        token = session.principal.token or ""
+        token = att.principal.token or ""
         try:
             while True:
                 until = intro.cached_until(token) or (intro.clock() + intro.cache_sec)
                 await asyncio.sleep(max(0.05, until - intro.clock()))
                 res = await intro.check(token)
                 if not res.valid:
-                    audit.warning("session %s JWT no longer valid: %s", session.id, res.reason)
-                    self.service._revoke(session, res.reason or "token revoked")
+                    audit.warning("connection %s (session %s) JWT no longer valid: %s", att.id,
+                                  att.session.id, res.reason)
+                    self.service.revoke_attachment(att, res.reason or "token revoked")
                     return
         except asyncio.CancelledError:
             pass

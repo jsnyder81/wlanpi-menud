@@ -26,7 +26,7 @@
     "1001": "Service shutting down or restarting; reconnect with backoff. A restart means a new epoch.",
     "1008": "Policy violation: Origin does not match the device's host (proxy.sock only).",
     "1013": "Try again later: the socket's session limit is reached.",
-    "4400": "Malformed frame before the handshake completed (not JSON, not v1 envelope).",
+    "4400": "Malformed frame before the handshake completed (not JSON, not v1 envelope), or a rich hello asking for the default session.",
     "4401": "Authentication failed: no auth frame within 10 s on proxy.sock without WebUI headers, invalid or expired token, token in the URL, or the session was revoked (WebUI logout, token revoked). Always preceded by an error frame with code AUTH_FAILED. Do not retry with the same credentials.",
     "4426": "No common protocol version. Preceded by an error frame with code VERSION."
   },
@@ -63,6 +63,25 @@
       "maxLength": 128
     },
     "role": { "enum": ["viewer", "operator", "admin", "provider"] },
+    "session_kind": {
+      "description": "default: the service's persistent default session. Its cursor and current view live in the service; it exists from service start and never ends. Any number of connections attach to it: input from any of them moves the one cursor and every attached connection gets the resulting view (the panel's screen is this session). new: an independent session with its own cursor, ending when its last connection detaches and the resume grace runs out.",
+      "enum": ["default", "new"]
+    },
+    "principal": {
+      "description": "Who a connection is: the identity prompts and confirmations are bound to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name"],
+      "properties": {
+        "kind": {
+          "description": "local: SO_PEERCRED on local.sock. webui: nginx auth_request headers on proxy.sock. jwt: core JWT in the first frame on proxy.sock.",
+          "enum": ["local", "webui", "jwt"]
+        },
+        "name": { "type": "string", "maxLength": 128 },
+        "uid": { "type": "integer", "minimum": 0 },
+        "did": { "description": "Core device id the session acts as in core.", "type": "string", "maxLength": 128 }
+      }
+    },
     "envelope": {
       "type": "object",
       "required": ["v", "type", "id"],
@@ -107,7 +126,7 @@
       }
     },
     "hello": {
-      "description": "C to S. First frame on local.sock and on pre-authenticated proxy.sock sessions; second frame after auth otherwise. Any other frame before hello is answered with error VERSION (fatal). Declares the client mode (thin or rich), what it can render, the protocol versions it speaks and, when reconnecting, the epoch and per-topic sequence numbers it last saw.",
+      "description": "C to S. First frame on local.sock and on pre-authenticated proxy.sock sessions; second frame after auth otherwise. Any other frame before hello is answered with error VERSION (fatal). Declares the client mode (thin or rich), which session to join, what it can render, the protocol versions it speaks and, when reconnecting, the epoch and per-topic sequence numbers it last saw.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
       "type": "object",
       "additionalProperties": false,
@@ -119,6 +138,10 @@
         "mode": {
           "description": "thin: the server holds the nav cursor and pushes view frames; the client sends input. rich: the client navigates the menu tree locally and sends invoke; the server sends no view frames.",
           "enum": ["thin", "rich"]
+        },
+        "session": {
+          "description": "default: attach to the persistent default session (thin only; a rich hello with session default is refused BAD_REQUEST, close 4400). new: open an independent session with its own cursor. Omitted: default for thin, new for rich, so a client written before this field existed keeps working.",
+          "$ref": "#/$defs/session_kind"
         },
         "protocol": {
           "description": "Protocol versions the client speaks. The server picks the highest common one, or replies error VERSION and closes 4426.",
@@ -167,7 +190,7 @@
           }
         },
         "resume": {
-          "description": "Reconnect state. If epoch equals the server's current epoch and every listed topic's seq equals the server's latest seq for that topic, the session continues (welcome.resumed=true) and the client's jobs stay attached. Otherwise the server sends a full snapshot: menu, one event with snapshot=true per subscribed topic, and a job frame for each of the session's live jobs. There is no replay buffer.",
+          "description": "Reconnect state. If epoch equals the server's current epoch and every listed topic's seq equals the server's latest seq for that topic, the session continues (welcome.resumed=true) and the client's jobs stay attached. Otherwise the server sends a full snapshot: menu, one event with snapshot=true per subscribed topic, and a job frame for each of the session's live jobs. There is no replay buffer. On the default session the cursor and view always continue (they live in the service); what resumes is this connection's topic stream: the topics listed in seq are subscribed again, and resumed=true when every listed seq is the server's latest.",
           "type": "object",
           "additionalProperties": false,
           "required": ["epoch"],
@@ -324,6 +347,10 @@
         "id": true,
         "type": { "const": "welcome" },
         "session_id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "session": {
+          "description": "Kind of session joined. The default session's session_id is the same for every connection in an epoch. Always sent by wlanpi-menud; optional in v1 so a server written before this field existed stays valid.",
+          "$ref": "#/$defs/session_kind"
+        },
         "epoch": { "$ref": "#/$defs/epoch" },
         "version": { "description": "Negotiated protocol version.", "type": "integer", "minimum": 1 },
         "mode": { "enum": ["thin", "rich"] },
@@ -331,20 +358,7 @@
           "description": "true: same epoch and unbroken sequence, the session continues. false: a full snapshot follows.",
           "type": "boolean"
         },
-        "principal": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["kind", "name"],
-          "properties": {
-            "kind": {
-              "description": "local: SO_PEERCRED on local.sock. webui: nginx auth_request headers on proxy.sock. jwt: core JWT in the first frame on proxy.sock.",
-              "enum": ["local", "webui", "jwt"]
-            },
-            "name": { "type": "string", "maxLength": 128 },
-            "uid": { "type": "integer", "minimum": 0 },
-            "did": { "description": "Core device id the session acts as in core.", "type": "string", "maxLength": 128 }
-          }
-        },
+        "principal": { "$ref": "#/$defs/principal" },
         "roles": {
           "type": "array",
           "items": { "$ref": "#/$defs/role" },
@@ -400,7 +414,7 @@
       }
     },
     "view": {
-      "description": "S to C, thin mode only. The session's current screen as view blocks: a menu list (a list block with selected), a result, a prompt or the home page. Sent after every input and whenever the shown data changes.",
+      "description": "S to C, thin mode only. The session's current screen as view blocks: a menu list (a list block with selected), a result, a prompt or the home page. Sent after every input and whenever the shown data changes. On the default session every attached connection gets every view, each rendered with that connection's own menu visibility.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
       "type": "object",
       "additionalProperties": false,
@@ -424,6 +438,21 @@
             "more": { "type": "boolean" }
           }
         },
+        "driven_by": {
+          "description": "Default session only: the connection whose input (or invoke, answer, cancel) produced the current state, so a surface can show for example 'driven from the WebUI'. Absent until someone drives the session. Concurrent input is last-write-wins.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["principal", "self"],
+          "properties": {
+            "principal": { "$ref": "#/$defs/principal" },
+            "surface": { "description": "hello.client.name of that connection.", "type": "string", "maxLength": 64 },
+            "self": { "description": "true when this connection drove it.", "type": "boolean" }
+          }
+        },
+        "answerable": {
+          "description": "prompt screen only: whether this connection may answer or cancel the prompt. false for a confirmation on the default session that another principal invoked: input from this connection is then refused FORBIDDEN and hints is empty.",
+          "type": "boolean"
+        },
         "hints": {
           "description": "Key legend, for example {\"left\":\"Back\",\"center\":\"Run\"}.",
           "type": "object",
@@ -433,7 +462,7 @@
       }
     },
     "prompt": {
-      "description": "S to C. Ask the session to pick, confirm or fill a form: a node's parameter, a node's confirm text, or mid-job (for example core returned needsSelection on a scan and the server lists core's candidates). Bound to this session and principal. Thin clients get one prompt per parameter.",
+      "description": "S to C. Ask the session to pick, confirm or fill a form: a node's parameter, a node's confirm text, or mid-job (for example core returned needsSelection on a scan and the server lists core's candidates). Bound to the invoking session. On the default session it goes to every attached connection and the first answer wins (a later answer gets NOT_FOUND); a confirm prompt stays bound to the invoking principal (any of its connections may answer it, anyone else gets FORBIDDEN). An independent session's prompts stay private to it. Thin clients get one prompt per parameter.",
       "allOf": [{ "$ref": "#/$defs/envelope" }],
       "type": "object",
       "additionalProperties": false,
@@ -445,6 +474,10 @@
         "prompt_id": { "$ref": "#/$defs/prompt_id" },
         "job_id": { "$ref": "#/$defs/job_id" },
         "node": { "$ref": "#/$defs/node_id" },
+        "invoked_by": {
+          "description": "The principal that invoked the job: the only one that may answer a confirm prompt.",
+          "$ref": "#/$defs/principal"
+        },
         "kind": { "enum": ["select", "confirm", "integer", "string", "form"] },
         "title": { "type": "string", "maxLength": 64 },
         "message": { "type": "string", "maxLength": 256 },
@@ -643,7 +676,7 @@
       }
     },
     "error_code": {
-      "description": "AUTH_FAILED: bad, missing, expired or revoked credentials (always fatal, close 4401). FORBIDDEN: the session's role or visibility does not allow this node, or the prompt belongs to another session. CONFLICT: core answered 409; message is core's. VERSION: no common protocol version, or a frame before hello (fatal, close 4426). BAD_REQUEST: frame failed schema validation or is not valid in this mode. NOT_FOUND: unknown node, job, prompt or cursor. CORE_UNAVAILABLE: core unreachable or returned 5xx (including AUTH_CLOCK_NOT_SET after the service's own re-mint failed). TIMEOUT: the action exceeded its timeout. INTERNAL: anything else.",
+      "description": "AUTH_FAILED: bad, missing, expired or revoked credentials (always fatal, close 4401). FORBIDDEN: the session's role or visibility does not allow this node, the prompt belongs to another session, or it is a confirmation on the default session that another principal invoked. CONFLICT: core answered 409; message is core's. VERSION: no common protocol version, or a frame before hello (fatal, close 4426). BAD_REQUEST: frame failed schema validation or is not valid in this mode. NOT_FOUND: unknown node, job, prompt or cursor. CORE_UNAVAILABLE: core unreachable or returned 5xx (including AUTH_CLOCK_NOT_SET after the service's own re-mint failed). TIMEOUT: the action exceeded its timeout. INTERNAL: anything else.",
       "enum": ["AUTH_FAILED", "FORBIDDEN", "CONFLICT", "VERSION", "BAD_REQUEST", "NOT_FOUND", "CORE_UNAVAILABLE", "TIMEOUT", "INTERNAL"]
     },
     "error": {
