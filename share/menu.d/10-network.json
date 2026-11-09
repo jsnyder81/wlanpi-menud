@@ -21,18 +21,6 @@
       }
     },
     {
-      "id": "network.wlan_interfaces",
-      "label": "WLAN Interfaces",
-      "parent": "network",
-      "order": 20,
-      "action": {
-        "handler": "network.wlan_interfaces",
-        "view": "table",
-        "shareable": true,
-        "fresh_sec": 10
-      }
-    },
-    {
       "id": "network.adapter_summary",
       "label": "Adapters",
       "parent": "network",

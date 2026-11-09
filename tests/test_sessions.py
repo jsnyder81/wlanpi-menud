@@ -210,7 +210,7 @@ async def test_default_session_survives_disconnects(harness):
     b, wb = await attach(harness, "panel")
     v = views(b)[-1]
     assert wb["session_id"] == wa["session_id"] and v["breadcrumb"] == ["Network"]
-    assert v["node"] == "network.wlan_interfaces" and v["driven_by"]["surface"] == "tui-a"
+    assert v["node"] == "network.adapter_summary" and v["driven_by"]["surface"] == "tui-a"
     assert v["driven_by"]["self"] is False
 
 

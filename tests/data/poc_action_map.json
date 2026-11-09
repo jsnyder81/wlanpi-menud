@@ -6,8 +6,8 @@
    "note": "same id"
   },
   "network.wlan_interfaces": {
-   "node": "network.wlan_interfaces",
-   "note": "same id"
+   "node": "network.interfaces",
+   "note": "merged into network.interfaces"
   },
   "network.eth0_ipconfig": {
    "node": "network.eth0_ipconfig",

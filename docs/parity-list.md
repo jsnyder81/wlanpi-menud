@@ -36,8 +36,8 @@ The **Team** column is for the parity review: mark each row `required`, `deferre
 
 | # | FPMS menu item | FPMS action | Manifest node | Core endpoint | Endpoint status | Parity status | Team | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Network > Interfaces | `show_interfaces` | `network.interfaces` | `GET /network/interfaces` | exists (#8) | works |  |  |
-| 2 | Network > WLAN Interfaces | `show_wlan_interfaces` | `network.wlan_interfaces` | `GET /network/interfaces` | exists (#8) | works |  | PoC filters wlan* from the interface list. `GET /network/config/status` adds namespaces if wanted. |
+| 1 | Network > Interfaces | `show_interfaces` | `network.interfaces` | `GET /network/interfaces` | exists (#8) | works |  | Merged with network.wlan_interfaces; grouped Ethernet/WLAN table with adapter sub-rows. |
+| 2 | Network > WLAN Interfaces | `show_wlan_interfaces` | (reserved) `network.wlan_interfaces` | `GET /network/interfaces` | exists (#8) | merged |  | Merged into network.interfaces (id reserved). |
 | 3 | Network > Eth0 IP Config | `show_eth0_ipconfig` | `network.eth0_ipconfig` | `GET /network/info/ (`/eth0_ipconfig_info`)` | exists (#12) | works |  | PoC uses `/network/interfaces/eth0` (#9); `eth0_ipconfig_info` matches FPMS's DHCP-server view. |
 | 4 | Network > Eth0 VLAN | `show_vlan` | `network.eth0_vlan` | `GET /network/ethernet/eth0/vlan` | exists (#10) | works |  |  |
 | 5 | Network > LLDP Neighbour | `show_lldp_neighbour` | `network.lldp` | `GET /network/info/ (`/lldp_neighbour_info`)` | exists (#12) | works |  | Also FPMS key1 shortcut. |

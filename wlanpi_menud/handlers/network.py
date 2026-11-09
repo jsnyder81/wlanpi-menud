@@ -25,22 +25,65 @@ def _iter_ifaces(data: Any) -> list[dict[str, Any]]:
 
 @handler("network.interfaces")
 async def interfaces(ctx: HandlerContext) -> HandlerResult:
-    rows = [[i.get("ifname"), (i.get("operstate") or "").upper(), _ipv4(i) or "-"]
-            for i in _iter_ifaces(await ctx.core.get_network_interfaces())]
+    ifaces_data = await ctx.core.get_network_interfaces()
+    all_ifaces = _iter_ifaces(ifaces_data)
+
+    adapter_info: dict[str, dict[str, Any]] = {}
+    try:
+        status = await ctx.core.get_network_config_status()
+        if isinstance(status, dict):
+            for ifmap in status.values():
+                if isinstance(ifmap, dict) and not isinstance(ifmap.get("error"), str):
+                    for name, info in ifmap.items():
+                        if isinstance(info, dict):
+                            adapter_info[name] = info
+    except Exception:
+        pass
+
+    eth_ifaces: list[dict[str, Any]] = []
+    wlan_ifaces: list[dict[str, Any]] = []
+    for i in all_ifaces:
+        ifname = str(i.get("ifname", ""))
+        if ifname == "lo":
+            continue
+        if ifname.startswith(("wlan", "wifi")):
+            wlan_ifaces.append(i)
+        else:
+            eth_ifaces.append(i)
+
+    rows: list[list[Any]] = []
+    for i in eth_ifaces:
+        rows.append([
+            "Ethernet",
+            i.get("ifname"),
+            (i.get("operstate") or "").upper(),
+            _ipv4(i) or "-",
+        ])
+
+    for i in wlan_ifaces:
+        name = str(i.get("ifname", ""))
+        rows.append([
+            "WLAN",
+            name,
+            (i.get("operstate") or "").upper(),
+            _ipv4(i) or "-",
+        ])
+        details: list[str] = []
+        mac = i.get("address") or (adapter_info.get(name, {}).get("addr"))
+        if mac:
+            details.append(f"MAC: {mac}")
+        ainfo = adapter_info.get(name, {})
+        if ainfo.get("type"):
+            details.append(f"Type: {ainfo['type']}")
+        if ainfo.get("driver"):
+            details.append(f"Driver: {ainfo['driver']}")
+        if details:
+            rows.append(["", "  " + " · ".join(details), "", ""])
+
     if not rows:
         return HandlerResult([B.text("No interfaces found")], "Interfaces")
-    return HandlerResult([B.table([("ifname", "Interface"), ("state", "State"), ("ipv4", "IPv4")], rows)], "Interfaces")
-
-
-@handler("network.wlan_interfaces")
-async def wlan_interfaces(ctx: HandlerContext) -> HandlerResult:
-    rows = [[i.get("ifname"), (i.get("operstate") or "").upper(), i.get("address"), _ipv4(i) or "-"]
-            for i in _iter_ifaces(await ctx.core.get_network_interfaces())
-            if str(i.get("ifname", "")).startswith("wlan")]
-    if not rows:
-        return HandlerResult([B.text("No WLAN interfaces")], "WLAN Interfaces")
-    cols = [("ifname", "Interface"), ("state", "State"), ("mac", "MAC"), ("ipv4", "IPv4")]
-    return HandlerResult([B.table(cols, rows)], "WLAN Interfaces")
+    cols = [("section", "Section"), ("ifname", "Interface"), ("state", "State"), ("ipv4", "IPv4")]
+    return HandlerResult([B.table(cols, rows)], "Interfaces")
 
 
 @handler("network.adapter_summary")

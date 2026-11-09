@@ -12,15 +12,15 @@
     {
       "type": "list",
       "selected": 1,
-      "text": "  Interfaces\n> WLAN Interfaces\n  Eth0 IP Config\n  Eth0 VLAN",
+      "text": "  Interfaces\n> Adapters\n  Eth0 IP Config\n  Eth0 VLAN",
       "items": [
         {
           "label": "Interfaces",
           "node": "network.interfaces"
         },
         {
-          "label": "WLAN Interfaces",
-          "node": "network.wlan_interfaces"
+          "label": "Adapters",
+          "node": "network.adapter_summary"
         },
         {
           "label": "Eth0 IP Config",

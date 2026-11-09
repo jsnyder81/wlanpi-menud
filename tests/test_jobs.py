@@ -339,3 +339,22 @@ async def test_jobs_topic(harness, fake):
     await final(a, j["job_id"])
     ev = await a.expect(lambda f: f["topic"] == "jobs" and f["data"] == [], type="event")
     assert not ev.get("snapshot")
+
+
+async def test_network_interfaces_grouped_table(harness):
+    a = await rich(harness)
+    j = await invoke(a, "network.interfaces")
+    res = await final(a, j["job_id"])
+    blocks = res["result"]["blocks"]
+    assert len(blocks) == 1 and blocks[0]["type"] == "table"
+    tbl = blocks[0]
+    cols = [c["key"] for c in tbl["columns"]]
+    assert cols == ["section", "ifname", "state", "ipv4"]
+    rows = tbl["rows"]
+    eth_row = next(r for r in rows if r[0] == "Ethernet" and r[1] == "eth0")
+    assert eth_row[2] == "UP" and eth_row[3] == "192.0.2.10/24"
+    wlan_row = next(r for r in rows if r[0] == "WLAN" and r[1] == "wlan0")
+    assert wlan_row[2] == "DOWN"
+    sub_row = next(r for r in rows if r[0] == "" and "MAC: 02:00:00:00:00:00" in str(r[1]))
+    assert "Type: managed" in str(sub_row[1])
+

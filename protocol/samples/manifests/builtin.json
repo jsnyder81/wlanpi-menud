@@ -19,16 +19,6 @@
       }
     },
     {
-      "id": "network.wlan_interfaces",
-      "label": "WLAN Interfaces",
-      "parent": "network",
-      "order": 20,
-      "action": {
-        "handler": "network.wlan_interfaces",
-        "view": "table"
-      }
-    },
-    {
       "id": "network.eth0_ipconfig",
       "label": "Eth0 IP Config",
       "parent": "network",
