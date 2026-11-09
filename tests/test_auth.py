@@ -175,42 +175,95 @@ async def test_revoke_frame_non_webui_principal_forbidden(harnesses):
     assert "local admin principals" in err["message"]
 
 
-async def test_revoke_admin_operator_and_default_session(harnesses):
-    gid = os.getgid()
-    uid = os.getuid()
-    h = await harnesses(local_uids={uid: ("admin",)}, local_gids={gid: ("operator",)})
+async def test_revoke_admin_operator_and_default_session(harnesses, monkeypatch):
+    import wlanpi_menud.server as server_module
+    from wlanpi_menud.auth import PeerCred
 
-    # Default session attachment
+    uid = os.getuid()
+    operator_uid = uid + 1000
+    h = await harnesses(local_uids={uid: ("admin",), operator_uid: ("operator",)})
+
+    real_peercred = server_module.peer_credentials
+    simulated_uid = uid
+
+    def fake_peercred(sock):
+        cred = real_peercred(sock)
+        return PeerCred(cred.pid, simulated_uid, cred.gid)
+
+    monkeypatch.setattr(server_module, "peer_credentials", fake_peercred)
+
+    # 1. Default session setup:
+    # A local client (e.g. front panel) is attached to the default session
     default_client = await h.connect("local")
     w_default = await default_client.hello("thin", session="default")
     assert w_default["session"] == "default"
     assert h.service.default_session.id in h.service.sessions
 
-    # WebUI sessions on proxy
+    # A WebUI client mirrors the default session (thin mode)
+    s_mirror = await h.connect("proxy", headers={"X-WebUI-User": "alice", "X-WebUI-Session": "S_MIRROR"})
+    w_mirror = await s_mirror.hello("thin", session="default")
+    assert w_mirror["session"] == "default"
+    assert len(h.service.default_session.attachments) == 2
+
+    # WebUI independent sessions on proxy
     s1 = await h.connect("proxy", headers={"X-WebUI-User": "alice", "X-WebUI-Session": "S1"})
     s2 = await h.connect("proxy", headers={"X-WebUI-User": "bob", "X-WebUI-Session": "S2"})
     for c in (s1, s2):
         await c.hello("rich")
 
-    # Plain wlanpi admin CAN revoke
+    # 2. Local admin client connects with real peercred (simulated_uid = uid)
     admin = await h.connect("local")
-    await admin.hello("rich")
-    await admin.send("revoke", webui_session="S1")
-    assert await s1.wait_closed() == 4401
+    w_admin = await admin.hello("rich")
+    assert "admin" in w_admin["roles"]
 
-    # Operator role gets FORBIDDEN
-    h_op = await harnesses(local_uids={}, local_gids={gid: ("operator",)})
-    operator = await h_op.connect("local")
-    await operator.hello("rich")
+    # 3. Operator client connects on the REAL local.sock of the SAME service with operator peercred
+    simulated_uid = operator_uid
+    operator = await h.connect("local")
+    w_op = await operator.hello("rich")
+    assert "admin" not in w_op["roles"]
+    assert "operator" in w_op["roles"]
+
+    # Switch peercred back for any future local connections
+    simulated_uid = uid
+
+    # Operator role gets FORBIDDEN when attempting to revoke s2
     await operator.send("revoke", webui_session="S2")
     err = await operator.expect(type="error")
     assert err["code"] == "FORBIDDEN"
     assert "local admin principals" in err["message"]
+    # Crucial pin: operator's attempt did NOT close s2 on this same service
     assert not s2.closed.is_set()
 
-    # The default session is never dropped by revoke
+    # Plain wlanpi admin CAN revoke s2
+    await admin.send("revoke", webui_session="S2")
+    assert await s2.wait_closed() == 4401
+
+    # Plain wlanpi admin also revokes s1
+    await admin.send("revoke", webui_session="S1")
+    assert await s1.wait_closed() == 4401
+
+    # 4. Default-session immunity:
+    # Revoke the WebUI session (S_MIRROR) that mirrors the default session
+    await admin.send("revoke", webui_session="S_MIRROR")
+    assert await s_mirror.wait_closed() == 4401
+
+    # Allow server handler to complete detachment of the closed connection
+    for _ in range(50):
+        if len(h.service.default_session.attachments) == 1:
+            break
+        await asyncio.sleep(0.01)
+
+    # Assert the default session object STILL exists in service.sessions
     assert h.service.default_session.id in h.service.sessions
+    assert h.service.sessions[h.service.default_session.id] is h.service.default_session
+
+    # Assert its other attachment (default_client) survived and remains intact
     assert not default_client.closed.is_set()
+    assert default_client.ws.close_code is None
+    assert len(h.service.default_session.attachments) == 1
+    remaining_att = next(iter(h.service.default_session.attachments))
+    assert remaining_att.principal.kind == "local"
+    assert remaining_att.principal.uid == uid
 
 
 async def test_revoke_frame_on_proxy_forbidden(harness):
