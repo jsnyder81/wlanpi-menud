@@ -67,6 +67,14 @@ async def test_proxy_origin_mismatch_closes_1008(harness):
     assert await c.wait_closed() == 1008
 
 
+async def test_proxy_duplicate_host_header_closes_1008(harness):
+    c = await harness.connect("proxy", headers=[("Host", "evil.example")])
+    err = await c.expect(type="error")
+    assert err["code"] == "FORBIDDEN"
+    assert err["close_code"] == 1008
+    assert await c.wait_closed() == 1008
+
+
 async def test_proxy_token_in_url_refused(harness, fake):
     tok = make_jwt("phone-1")
     fake.remote_tokens[tok] = {"valid": True, "did": "phone-1", "exp": time.time() + 600, "jti": "x"}
@@ -164,6 +172,45 @@ async def test_revoke_frame_non_webui_principal_forbidden(harnesses):
     await c.send("revoke", webui_session="S1")
     err = await c.expect(type="error")
     assert err["code"] == "FORBIDDEN"
+    assert "local admin principals" in err["message"]
+
+
+async def test_revoke_admin_operator_and_default_session(harnesses):
+    gid = os.getgid()
+    uid = os.getuid()
+    h = await harnesses(local_uids={uid: ("admin",)}, local_gids={gid: ("operator",)})
+
+    # Default session attachment
+    default_client = await h.connect("local")
+    w_default = await default_client.hello("thin", session="default")
+    assert w_default["session"] == "default"
+    assert h.service.default_session.id in h.service.sessions
+
+    # WebUI sessions on proxy
+    s1 = await h.connect("proxy", headers={"X-WebUI-User": "alice", "X-WebUI-Session": "S1"})
+    s2 = await h.connect("proxy", headers={"X-WebUI-User": "bob", "X-WebUI-Session": "S2"})
+    for c in (s1, s2):
+        await c.hello("rich")
+
+    # Plain wlanpi admin CAN revoke
+    admin = await h.connect("local")
+    await admin.hello("rich")
+    await admin.send("revoke", webui_session="S1")
+    assert await s1.wait_closed() == 4401
+
+    # Operator role gets FORBIDDEN
+    h_op = await harnesses(local_uids={}, local_gids={gid: ("operator",)})
+    operator = await h_op.connect("local")
+    await operator.hello("rich")
+    await operator.send("revoke", webui_session="S2")
+    err = await operator.expect(type="error")
+    assert err["code"] == "FORBIDDEN"
+    assert "local admin principals" in err["message"]
+    assert not s2.closed.is_set()
+
+    # The default session is never dropped by revoke
+    assert h.service.default_session.id in h.service.sessions
+    assert not default_client.closed.is_set()
 
 
 async def test_revoke_frame_on_proxy_forbidden(harness):

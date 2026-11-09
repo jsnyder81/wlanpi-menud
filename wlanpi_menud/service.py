@@ -392,7 +392,7 @@ class Service:
                     self.push_view(session)
             elif t == "revoke":
                 if a.socket_kind != "local" or "admin" not in a.principal.roles:
-                    raise InvokeRefused("FORBIDDEN", "revoke is restricted to the webui principal on local.sock")
+                    raise InvokeRefused("FORBIDDEN", "revoke is restricted to local admin principals on local.sock")
                 target = frame.get("webui_session")
                 if not isinstance(target, str) or not target:
                     raise InvokeRefused("BAD_REQUEST", "webui_session is required")

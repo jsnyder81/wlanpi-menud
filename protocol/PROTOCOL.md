@@ -247,12 +247,16 @@ failure has a typed code.
 
 ## WebUI logout and revocation
 
-- `revoke`: C to S frame on `local.sock`, restricted to the WebUI principal
-  (`admin` role on `local.sock`). Carries `{"v":1, "type":"revoke", "id":..., "webui_session":...}`.
+- `revoke`: C to S frame on `local.sock`, restricted to local `admin` principals
+  on `local.sock`. Carries `{"v":1, "type":"revoke", "id":..., "webui_session":...}`.
   Tells wlanpi-menud to close every connection and independent session bound to
   that WebUI session id (`Service.revoke_webui_session`, close code 4401).
-  No reply on success; non-admin callers or calls over `proxy.sock` are refused
-  with an `error` frame with code `FORBIDDEN`.
+  Any local admin UID on `local.sock` (including the default `wlanpi` user) may
+  close WebUI menu connections for a given `webui_session` id; this is DoS-only
+  with no privilege gain on a single-user device.
+  The default session is never ended by revoke.
+  No reply on success; non-admin callers (such as the operator group) or calls
+  over `proxy.sock` are refused with an `error` frame with code `FORBIDDEN`.
 
 ## Not yet in the protocol
 

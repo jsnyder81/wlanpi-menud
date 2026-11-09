@@ -30,7 +30,10 @@ to wlanpi-core. See `FPMS Re-Architecture Plan.md` for the design and
 
 - `local.sock` (`/run/wlanpi-menud/local.sock`): `SO_PEERCRED` uid/gid
   allowlist (root is the panel, the `wlanpi` user, the `wlanpi-menud` group,
-  provider uids). No auth frame.
+  provider uids). No auth frame. Any local admin UID on `local.sock`
+  (including `wlanpi`) may revoke WebUI menu connections for a session id;
+  this is DoS-only with no privilege gain on a single-user device, and the
+  default session is never ended by revoke.
 - `proxy.sock` (mode 0660, nginx's group): nginx `auth_request` headers
   (`X-WebUI-User`, `X-WebUI-Session`) or a core JWT in the first frame
   (checked with core introspection, cached at most 60 s or until `exp`).

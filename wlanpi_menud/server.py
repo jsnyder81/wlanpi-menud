@@ -20,6 +20,7 @@ from typing import Any
 
 from websockets.asyncio.server import Server as WsServer
 from websockets.asyncio.server import ServerConnection, unix_serve
+from websockets.datastructures import MultipleValuesError
 from websockets.exceptions import ConnectionClosed
 
 from . import protocol
@@ -224,10 +225,16 @@ class Server:
         headers = req.headers
         if token_in_url(req.path):
             await conn.fail(protocol.error("s:0", "AUTH_FAILED", "tokens in the URL are refused"))
-        if not origin_ok(headers.get("Origin"), headers.get("Host"), self.config.allowed_origins):
-            audit.warning("proxy.sock refused Origin %s for Host %s", headers.get("Origin"), headers.get("Host"))
+        try:
+            origin_val = headers.get("Origin")
+            host_val = headers.get("Host")
+            user, wsess = headers.get("X-WebUI-User"), headers.get("X-WebUI-Session")
+        except MultipleValuesError as exc:
+            audit.warning("proxy.sock refused duplicate %s header", exc)
+            await conn.fail(protocol.error("s:0", "FORBIDDEN", f"duplicate {exc} header", close_code=1008))
+        if not origin_ok(origin_val, host_val, self.config.allowed_origins):
+            audit.warning("proxy.sock refused Origin %s for Host %s", origin_val, host_val)
             await conn.fail(protocol.error("s:0", "FORBIDDEN", "Origin does not match this device", close_code=1008))
-        user, wsess = headers.get("X-WebUI-User"), headers.get("X-WebUI-Session")
         if user or wsess:
             if not (user and wsess):
                 await conn.fail(protocol.error("s:0", "AUTH_FAILED", "incomplete WebUI session headers"))

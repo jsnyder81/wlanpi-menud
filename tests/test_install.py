@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import stat
 import subprocess
+import time
 from pathlib import Path
 
 from wlanpi_menud.config import Config
@@ -74,42 +75,44 @@ def test_debian_package_installs_what_the_defaults_point_at():
 
 def _run_postrm(tmp_path, group_line: str, passwd: str, action: str = "purge"):
     """Run debian/wlanpi-menud.postrm with getent/groupdel/rm stubbed on PATH."""
-    bin_ = tmp_path / "bin"
+    bin_ = tmp_path / f"bin-{time.time_ns()}"
     bin_.mkdir()
-    log = tmp_path / "log"
+    log_grp = tmp_path / f"log-grp-{time.time_ns()}"
+    log_rm = tmp_path / f"log-rm-{time.time_ns()}"
     (bin_ / "getent").write_text(f"""#!/bin/sh
 if [ "$1" = group ]; then [ -n "{group_line}" ] && echo "{group_line}" || exit 2; fi
 if [ "$1" = passwd ]; then printf '%s' "{passwd}"; fi
 """)
-    (bin_ / "groupdel").write_text(f'#!/bin/sh\necho "groupdel $*" >> {log}\n')
-    for tool in ("rm", "rmdir"):
-        (bin_ / tool).write_text("#!/bin/sh\nexit 0\n")  # never touch the host
+    (bin_ / "groupdel").write_text(f'#!/bin/sh\necho "groupdel $*" >> {log_grp}\n')
+    (bin_ / "rm").write_text(f'#!/bin/sh\necho "rm $*" >> {log_rm}\n')
+    (bin_ / "rmdir").write_text("#!/bin/sh\nexit 0\n")  # never touch the host
     for f in bin_.iterdir():
         f.chmod(0o755)
     script = (INSTALL.parent / "debian/wlanpi-menud.postrm").read_text().replace("#DEBHELPER#", "")
     r = subprocess.run(["sh", "-c", script, "postrm", action], capture_output=True, text=True, check=False,
                        env={"PATH": f"{bin_}:/usr/bin:/bin"})
-    return r, (log.read_text() if log.exists() else "")
+    return r, (log_grp.read_text() if log_grp.exists() else ""), (log_rm.read_text() if log_rm.exists() else "")
 
 
 def test_postrm_purge_removes_unused_group(tmp_path):
-    r, log = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "wlanpi:x:1000:1000::/home/wlanpi:/bin/sh\n")
-    assert r.returncode == 0 and log == "groupdel wlanpi-menud\n"
+    r, grp_log, _ = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "wlanpi:x:1000:1000::/home/wlanpi:/bin/sh\n")
+    assert r.returncode == 0 and grp_log == "groupdel wlanpi-menud\n"
 
 
 def test_postrm_purge_keeps_group_with_members(tmp_path):
-    r, log = _run_postrm(tmp_path, "wlanpi-menud:x:986:alice", "wlanpi:x:1000:1000::/home/wlanpi:/bin/sh\n")
-    assert r.returncode == 0 and log == "" and "keeping group" in r.stderr
+    r, grp_log, _ = _run_postrm(tmp_path, "wlanpi-menud:x:986:alice", "wlanpi:x:1000:1000::/home/wlanpi:/bin/sh\n")
+    assert r.returncode == 0 and grp_log == "" and "keeping group" in r.stderr
 
 
 def test_postrm_purge_keeps_group_that_is_a_primary_group(tmp_path):
-    r, log = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "svc:x:990:986::/:/usr/sbin/nologin\n")
-    assert r.returncode == 0 and log == ""
+    r, grp_log, _ = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "svc:x:990:986::/:/usr/sbin/nologin\n")
+    assert r.returncode == 0 and grp_log == ""
 
 
-def test_postrm_remove_and_missing_group_are_no_ops(tmp_path):
-    r, log = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "", action="remove")
-    assert r.returncode == 0 and log == ""
-    (tmp_path / "bin").rename(tmp_path / "bin0")
-    r, log = _run_postrm(tmp_path, "", "")
-    assert r.returncode == 0 and log == ""
+def test_postrm_remove_unlinks_webui_snippet(tmp_path):
+    r, grp_log, rm_log = _run_postrm(tmp_path, "wlanpi-menud:x:986:", "", action="remove")
+    assert r.returncode == 0
+    assert grp_log == ""
+    assert "rm -f /etc/wlanpi-webui/nginx/conf.d/wlanpi-menud.conf" in rm_log
+    r, grp_log, _ = _run_postrm(tmp_path, "", "")
+    assert r.returncode == 0 and grp_log == ""
