@@ -643,6 +643,8 @@
         "mode": { "type": ["string", "null"] },
         "software_version": { "type": ["string", "null"] },
         "ip": { "type": ["string", "null"] },
+        "eth0": { "type": ["string", "null"] },
+        "wlan0": { "type": ["string", "null"] },
         "cpu": { "type": ["string", "number", "null"] },
         "cpu_temp": { "type": ["string", "number", "null"] },
         "uptime": { "type": ["string", "number", "null"] },

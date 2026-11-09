@@ -1,6 +1,6 @@
 """First-party Python action handlers, registered by dotted name.
 
-A manifest references one with ``"action": {"handler": "network.adapter_summary"}``.
+A manifest references one with ``"action": {"handler": "network.interfaces"}``.
 Handlers live in the wlanpi-menud tree only; third parties use providers.
 """
 

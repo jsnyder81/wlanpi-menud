@@ -4,5 +4,5 @@
   "id": "s:7",
   "topic": "device.summary",
   "seq": 42,
-  "data": { "hostname": "wlanpi-a1b2", "eth0": "192.0.2.10" }
+  "data": { "hostname": "wlanpi-a1b2", "unknown_key": "unexpected" }
 }

@@ -21,18 +21,6 @@
       }
     },
     {
-      "id": "network.adapter_summary",
-      "label": "Adapters",
-      "parent": "network",
-      "order": 25,
-      "action": {
-        "handler": "network.adapter_summary",
-        "view": "table",
-        "shareable": true,
-        "fresh_sec": 10
-      }
-    },
-    {
       "id": "network.eth0_ipconfig",
       "label": "Eth0 IP Config",
       "parent": "network",

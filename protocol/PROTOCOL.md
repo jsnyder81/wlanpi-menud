@@ -233,6 +233,8 @@ failure has a typed code.
     rich gets an independent session, as rich clients always did. Thin
     clients that need a private cursor (the pre-sessions behaviour) send
     `session: "new"`.
+  - Device summary: optional `eth0` and `wlan0` per-interface IP fields
+    in `device.summary` payload (additive v1; old clients ignore them).
 
 ## Contract synchronization (WebUI)
 

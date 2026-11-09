@@ -47,7 +47,7 @@ def test_menu_walk_and_invoke_effect():
     assert c.screen == "menu" and c.stack == () and v.kids(None)[c.index] == "network"
     c, eff = press(c, ["center"], ctx)
     assert c.stack == ("network",) and c.index == 0
-    c, eff = press(c, ["down", "down", "down", "down"], ctx)  # interfaces, adapters, eth0 ip, vlan, lldp
+    c, eff = press(c, ["down", "down", "down"], ctx)  # interfaces, eth0 ip, vlan, lldp
     assert v.kids("network")[c.index] == "network.lldp"
     c, eff = press(c, ["right"], ctx)
     assert c.screen == "result" and c.node == "network.lldp"
@@ -124,10 +124,10 @@ async def test_two_thin_sessions_navigate_independently(harness):
 
     va = await a.input("down")  # A: top menu
     await a.input("center")  # A: into Network
-    va = await a.input("down")  # A: Network > Adapters
+    va = await a.input("down")  # A: Network > Eth0 IP Config
     vb = await b.input("down")  # B: top menu, untouched by A
     vb = await b.input("down")  # B: second top-level entry
-    assert va["screen"] == "menu" and va["breadcrumb"] == ["Network"] and va["node"] == "network.adapter_summary"
+    assert va["screen"] == "menu" and va["breadcrumb"] == ["Network"] and va["node"] == "network.eth0_ipconfig"
     assert vb["screen"] == "menu" and vb.get("breadcrumb", []) == [] and vb["node"] == "bluetooth"
     sa = harness.service.sessions[wa["session_id"]].cursor
     sb = harness.service.sessions[wb["session_id"]].cursor
@@ -136,7 +136,7 @@ async def test_two_thin_sessions_navigate_independently(harness):
     # A runs an action; B stays on its menu and receives no view for A's job.
     await a.input("center")
     res = await a.expect(lambda f: f["screen"] == "result", type="view")
-    assert res["node"] == "network.adapter_summary"
+    assert res["node"] == "network.eth0_ipconfig"
     await asyncio.sleep(0.1)
     b_views = [f for f in b.frames if f["type"] == "view"]
     assert b_views[-1]["node"] == "bluetooth" and all(f.get("screen") != "result" for f in b_views)

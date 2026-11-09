@@ -142,12 +142,28 @@ class Poller:
         svc.set_context(DeviceContext(mode, frozenset(caps), svc.routes))
 
         bt_power = str((bt or {}).get("power", "")).lower() in ("on", "yes", "true", "powered")
+
+        eth0_ip = None
+        wlan0_ip = None
+        ifaces_list = [i for group in (ifaces or {}).values() if isinstance(group, list) for i in group if isinstance(i, dict)] if isinstance(ifaces, dict) else (ifaces if isinstance(ifaces, list) else [])
+        for i in ifaces_list:
+            ifname = i.get("ifname")
+            if ifname in ("eth0", "wlan0"):
+                for a in (i.get("addr_info") or []):
+                    if isinstance(a, dict) and a.get("family") == "inet" and a.get("local"):
+                        if ifname == "eth0" and eth0_ip is None:
+                            eth0_ip = str(a.get("local"))
+                        elif ifname == "wlan0" and wlan0_ip is None:
+                            wlan0_ip = str(a.get("local"))
+
         summary = {
             "hostname": (info or {}).get("hostname"),
             "model": model_name,
             "mode": mode,
             "software_version": (info or {}).get("software_version"),
             "ip": (stats or {}).get("ip"),
+            "eth0": eth0_ip,
+            "wlan0": wlan0_ip,
             "cpu": (stats or {}).get("cpu"),
             "cpu_temp": (stats or {}).get("cpu_temp"),
             "uptime": (stats or {}).get("uptime"),
