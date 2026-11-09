@@ -55,3 +55,5 @@ table).
 | `05-token-introspection.md` | Remote JWT clients | Later (Phase 4) |
 
 These are **drafts only** — except 03, filed as #481 (Nov 8 2026); nothing else has been filed to GitHub as of this commit.
+
+**Branch status (Nov 9):** implementation began on `wlanpi-core` branch `feat/menu-rearchitecture-core` — 01 (reserve did) and 05 (introspection) land as separate cherry-pickable commits; **02, 03 and 04 were deferred to later phases by user decision** (03 continues to live as issue #481 upstream).
