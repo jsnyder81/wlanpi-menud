@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from typing import Any
 
 from conftest import BUILTIN
 
@@ -225,4 +226,43 @@ async def test_nav_invalid_node_and_detached(harness):
     att.send = lambda f, **kw: sent.append(f)
     harness.service.handle_frame(att, {"v": 1, "type": "nav", "id": "nav_det", "node": "network"})
     assert len(sent) == 1 and sent[0]["type"] == "error" and sent[0]["code"] == "FORBIDDEN"
+
+
+async def test_nav_visibility_guard(harness):
+    c = await harness.connect()
+    w = await c.hello("thin", session="new")
+    await c.expect(type="view")
+
+    # 1. Hidden branch node (route-gated: utils.cloud requires missing core endpoint)
+    # The node exists in menu, but is not visible to this session
+    assert harness.service.menu.get("utils.cloud") is not None
+    assert not harness.service.sessions[w["session_id"]].attachments[0].menu_view.visible("utils.cloud")
+    mid_branch = await c.send("nav", node="utils.cloud")
+    err_branch = await c.expect(lambda f: f["id"] == mid_branch, type="error")
+    assert err_branch["code"] == "FORBIDDEN"
+    assert "not available to this session" in err_branch["message"]
+
+    # 2. Hidden action node (route-gated: utils.cloud.mist)
+    assert harness.service.menu.get("utils.cloud.mist") is not None
+    assert not harness.service.sessions[w["session_id"]].attachments[0].menu_view.visible("utils.cloud.mist")
+    mid_leaf = await c.send("nav", node="utils.cloud.mist")
+    err_leaf = await c.expect(lambda f: f["id"] == mid_leaf, type="error")
+    assert err_leaf["code"] == "FORBIDDEN"
+
+    # 3. Mode-filtered branch node (apps is hidden in hotspot mode)
+    harness.fake.mode = "hotspot"
+    harness.poller.invalidate_context()
+    await harness.poller.poll_once()
+    att = harness.service.sessions[w["session_id"]].attachments[0]
+    assert harness.service.menu.get("apps") is not None
+    assert not att.menu_view.visible("apps")
+    mid_mode = await c.send("nav", node="apps")
+    err_mode = await c.expect(lambda f: f["id"] == mid_mode, type="error")
+    assert err_mode["code"] == "FORBIDDEN"
+
+    # Verify session cursor did not navigate to any forbidden node
+    cur = harness.service.sessions[w["session_id"]].cursor
+    assert "utils.cloud" not in cur.stack and cur.node != "utils.cloud"
+    assert "apps" not in cur.stack
+
 
