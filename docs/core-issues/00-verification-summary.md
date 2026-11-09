@@ -56,4 +56,4 @@ table).
 
 These are **drafts only** — except 03, filed as #481 (Nov 8 2026); nothing else has been filed to GitHub as of this commit.
 
-**Branch status (Nov 9):** implementation began on `wlanpi-core` branch `feat/menu-rearchitecture-core` — 01 (reserve did) and 05 (introspection) land as separate cherry-pickable commits; **02, 03 and 04 were deferred to later phases by user decision** (03 continues to live as issue #481 upstream).
+**Branch status (Nov 9):** implementation began on `wlanpi-core` branch `feat/menu-rearchitecture-core` — **01 (reserve did) lands as the sole commit**; **02, 03, 04 and 05 were deferred to later phases by user decision** (03 continues to live as issue #481 upstream; 05 is Phase 4-only — menud's JWT path stays fail-closed until then; WIP preserved in the repo's git stash and `/tmp/opencode/core-05-introspect-wip.patch`).
