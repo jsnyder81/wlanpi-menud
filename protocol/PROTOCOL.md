@@ -226,6 +226,16 @@ failure has a typed code.
     clients that need a private cursor (the pre-sessions behaviour) send
     `session: "new"`.
 
+## Contract synchronization (WebUI)
+
+`wlanpi-webui` vendors `frames.schema.json` at `protocol/frames.schema.json` to generate
+its TypeScript types without cross-repo CI checkout dependencies. Whenever `frames.schema.json`
+changes in this repository, re-run WebUI's vendor-sync script to update the vendored schema
+and regenerated types:
+```bash
+cd /path/to/wlanpi-webui && ./scripts/vendor-sync.sh /path/to/wlanpi-menud
+```
+
 ## Manifest notes (loader behaviour)
 
 - Roots load in order: `menu.d/` built-ins, `plugins.d/<name>/`, then
