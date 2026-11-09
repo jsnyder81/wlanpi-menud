@@ -23,7 +23,7 @@ from .core.generated import ROUTES
 from .handlers import handler_exists
 from .jobs import InvokeRefused, Job, JobManager, Prompt
 from .loader import LoadResult, load_menu
-from .menu import DeviceContext, Menu, RouteTable
+from .menu import DeviceContext, Menu, Node, RouteTable
 from .nav import NavContext, PromptState, handle_input, normalize, path_to
 from .outqueue import OutQueue
 from .session import DEFAULT, NEW, Attachment, Session
@@ -150,10 +150,12 @@ class Service:
 
     def push_view(self, session: Session, msg_id: str | None = None, reply_to: Attachment | None = None) -> None:
         """Render the session's screen for every attachment. ``reply_to`` gets it with ``msg_id``."""
-        if not session.thin:
+        if not session.thin and reply_to is None and not (session.cursor.job_id and session.cursor.screen in ("result", "busy")):
             return
         for a in list(session.attachments):
             reply = msg_id is not None and (reply_to is None or a is reply_to)
+            if not session.thin and not reply and not (session.cursor.job_id and session.cursor.screen in ("result", "busy")):
+                continue
             frame = render_view(session, a, msg_id if reply else a.next_id(), self.jobs, self.hub.data)
             a.send(frame, coalesce=None if reply else "view")
 
@@ -178,11 +180,11 @@ class Service:
             self.poller.invalidate_context()
 
     def job_changed_for(self, session: Session, job: Job) -> None:
-        if session.thin and session.cursor.job_id == job.id and session.cursor.screen in ("result", "prompt"):
+        if session.cursor.job_id == job.id and session.cursor.screen in ("result", "prompt"):
             self.push_view(session)
 
     def prompt_opened(self, session: Session, p: Prompt) -> None:
-        if not session.thin:
+        if not session.thin and not session.cursor.job_id:
             return
         default = 0
         if p.kind == "select":
@@ -195,7 +197,7 @@ class Service:
         self.push_view(session)
 
     def prompt_closed(self, session: Session, p: Prompt) -> None:
-        if session.thin and session.cursor.prompt_id == p.id:
+        if (session.thin or session.cursor.job_id) and session.cursor.prompt_id == p.id:
             session.cursor = replace(session.cursor, screen="result", prompt_id=None)
             self.push_view(session)
 
@@ -390,6 +392,18 @@ class Service:
                     session.drove(a)
                     session.cursor = replace(session.cursor, screen="menu", job_id=None, node=None)
                     self.push_view(session)
+            elif t == "nav":
+                if a not in session.attachments:
+                    raise InvokeRefused("FORBIDDEN", "connection is detached")
+                if session.thin:
+                    self._guard_confirm(a)
+                nid = frame["node"]
+                node = self.menu.get(nid)
+                if node is None:
+                    raise InvokeRefused("NOT_FOUND", f"unknown node {nid}")
+                if not a.menu_view.visible(nid):
+                    raise InvokeRefused("FORBIDDEN", f"{nid} is not available to this session")
+                self._nav(a, mid, node)
             elif t == "revoke":
                 if a.socket_kind != "local" or "admin" not in a.principal.roles:
                     raise InvokeRefused("FORBIDDEN", "revoke is restricted to local admin principals on local.sock")
@@ -401,6 +415,47 @@ class Service:
                 raise InvokeRefused("BAD_REQUEST", f"{t} is only valid once, at the start")
         except InvokeRefused as exc:
             self._refuse(a, mid, exc)
+
+    def _nav(self, a: Attachment, mid: str, node: Node) -> None:
+        session = a.session
+        nid = node.id
+        session.drove(a)
+        session.menu_view = a.menu_view
+        if node.is_branch:
+            cur: str | None = nid
+            chain: list[str] = []
+            while cur is not None:
+                chain.append(cur)
+                cur = a.menu_view.nodes[cur].parent if cur in a.menu_view.nodes else None
+            stack = tuple(reversed(chain))
+            session.cursor = replace(
+                session.cursor,
+                screen="menu",
+                stack=stack,
+                index=0,
+                job_id=None,
+                node=None,
+                prompt_id=None,
+                return_screen="menu",
+            )
+            self.push_view(session, mid, reply_to=a)
+        else:
+            where = path_to(nid, a.menu_view)
+            stack = where[0] if where else ()
+            index = where[1] if where else 0
+            job = self.jobs.invoke(session, a, nid, None, False, mid)
+            session.cursor = replace(
+                session.cursor,
+                screen="result",
+                stack=stack,
+                index=index,
+                node=nid,
+                job_id=job.id,
+                page=0,
+                prompt_id=None,
+                return_screen="menu",
+            )
+            self.push_view(session, mid, reply_to=a)
 
     def _guard_confirm(self, a: Attachment) -> None:
         """On a shared screen, a confirmation belongs to the principal that invoked it:

@@ -174,3 +174,55 @@ async def test_menu_follows_device_mode(harness):
     ids = {n["id"] for n in m["nodes"]}
     assert m["revision"] > first["revision"] and m["device_mode"] == "hotspot"
     assert "apps" not in ids and "utils.ssid_passphrase" in ids
+
+
+async def test_nav_to_branch(harness):
+    c = await harness.connect()
+    w = await c.hello("thin", session="new")
+    await c.expect(type="view")  # Initial home view
+
+    # Nav to branch "network"
+    mid = await c.send("nav", node="network")
+    v = await c.expect(lambda f: f["id"] == mid, type="view")
+    assert v["screen"] == "menu"
+    assert v["breadcrumb"] == ["Network"]
+    assert v["title"] == "Network"
+    cur = harness.service.sessions[w["session_id"]].cursor
+    assert cur.screen == "menu" and cur.stack == ("network",) and cur.index == 0
+
+
+async def test_nav_to_view_action_renders_view(harness):
+    c = await harness.connect()
+    w = await c.hello("thin", session="new")
+    await c.expect(type="view")  # Initial home view
+
+    # Nav to view-action "network.lldp"
+    mid = await c.send("nav", node="network.lldp")
+    # Resulting view frame is pushed with the action result blocks
+    v = await c.expect(lambda f: f.get("screen") == "result" and f.get("node") == "network.lldp", type="view")
+    assert v["screen"] == "result"
+    assert v["node"] == "network.lldp"
+    assert any(b.get("type") in ("kv", "table") for b in v.get("blocks", []))
+    cur = harness.service.sessions[w["session_id"]].cursor
+    assert cur.screen == "result" and cur.stack == ("network",) and cur.node == "network.lldp"
+
+
+async def test_nav_invalid_node_and_detached(harness):
+    c = await harness.connect()
+    w = await c.hello("thin", session="new")
+    await c.expect(type="view")
+
+    # Unknown node -> NOT_FOUND
+    mid1 = await c.send("nav", node="nonexistent.node")
+    err1 = await c.expect(lambda f: f["id"] == mid1, type="error")
+    assert err1["code"] == "NOT_FOUND"
+
+    # Detached attachment -> FORBIDDEN
+    session = harness.service.sessions[w["session_id"]]
+    att = session.attachments[0]
+    session.detach(att)
+    sent: list[dict[str, Any]] = []
+    att.send = lambda f, **kw: sent.append(f)
+    harness.service.handle_frame(att, {"v": 1, "type": "nav", "id": "nav_det", "node": "network"})
+    assert len(sent) == 1 and sent[0]["type"] == "error" and sent[0]["code"] == "FORBIDDEN"
+

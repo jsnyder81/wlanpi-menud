@@ -59,15 +59,23 @@ S view        (thin only)        S menu
 
 | | Thin (panel, TUI) | Rich (WebUI, mobile) |
 | --- | --- | --- |
-| Cursor | Held by the server, one per session (the default session's is shared) | Held by the client |
-| Client sends | `input` (up, down, left, right, center, key1 to key3), `invoke` for shortcuts | `invoke` on a node id |
-| Server sends | `view` after every input and when shown data changes | No `view` frames |
+| Cursor | Held by the server, one per session (the default session's is shared) | Held by the client (server cursor updated on `nav`) |
+| Client sends | `input` (up, down, left, right, center, key1 to key3), `invoke` for shortcuts, `nav` | `invoke` on a node id, `nav` to navigate / fetch landing views |
+| Server sends | `view` after every input and when shown data changes | `view` in reply to `nav` |
 | Parameters | One `prompt` per parameter | Client renders a form from `menu` node params; missing ones are still prompted |
 | Paging | up/down on a result page; the server fetches pages on demand | `page` with the cursor |
 
 Both modes share the same `menu`, jobs, prompts and results. `input` from a
 rich session is `BAD_REQUEST`. Two independent sessions never share a
 cursor; connections attached to the default session always do.
+
+## Direct navigation (`nav`)
+
+The additive `nav` frame (`{"v": 1, "type": "nav", "id": "<id>", "node": "<node_id>"}`)
+allows clients (thin or rich) to move the session cursor directly to a node:
+- **Branch node**: The cursor moves to the branch with all ancestors auto-expanded in its stack, pushing the resulting menu `view` frame.
+- **View-action node**: The action is invoked, the session cursor transitions to the result screen with ancestors auto-expanded, and the resulting `view` frame is pushed.
+- **Errors**: `NOT_FOUND` if the node does not exist in the menu; `FORBIDDEN` if the node is hidden for the session or if the connection is detached.
 
 ## Sessions
 

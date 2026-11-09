@@ -21,7 +21,7 @@ FRAMES = sorted((SAMPLES / "frames").rglob("*.json"))
 BAD_MANIFESTS = sorted((SAMPLES / "invalid" / "manifests").glob("*.json"))
 BAD_FRAMES = sorted((SAMPLES / "invalid" / "frames").glob("*.json"))
 
-C2S = {"auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel", "revoke"}
+C2S = {"auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel", "revoke", "nav"}
 S2C = {"welcome", "menu", "view", "prompt", "job", "event", "error"}
 BLOCKS = {"text", "kv", "table", "list", "qr", "status", "progress", "confirm"}
 JOB_STATES = {"queued", "progress", "result", "error", "cancelled"}
