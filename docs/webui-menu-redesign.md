@@ -1,6 +1,6 @@
 # WebUI menu panel redesign
 
-Status: implemented on wlanpi-webui branch redesign/webui-menu-panel (Nov 10, 2026); verification pending. Original date: November 10, 2026.
+Status: IMPLEMENTED and VERIFIED APPROVE (Nov 10, 2026) on wlanpi-webui branch redesign/webui-menu-panel; review: docs/reviews/webui-redesign-review.md.
 Scope: the browser menu surface in `wlanpi-webui` (`/menu`). Greenfield: the current plugin does not need to be maintained.
 Inputs: *FPMS Re-Architecture Plan.md*, *FPMS Re-Architecture - UX TODO.md* (rounds 1 and 2), `protocol/PROTOCOL.md`, `protocol/frames.schema.json`, and the current plugin on `wlanpi-webui` branch `phase2/webui-menu-panel`.
 
