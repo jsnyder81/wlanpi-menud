@@ -645,3 +645,11 @@ The legacy `complications` topic is not removed in protocol v1.
 | Q4 | Per-principal layouts | Deferred (4.1). Additive when wanted |
 | Q5 | Should activating a tile on a thin surface open its `node`? | Deferred. Home's key map is `down: Menu` only, and tile focus is a navigation change that deserves its own review |
 | Q6 | Health thresholds (battery, temperature, RSSI) | Constants in 3.2 and 3.3. Needs a pass by someone who knows the hardware's thermal limits per model |
+
+### Decision log (Nov 13, 2026 — user rulings)
+
+- **Q1 RESOLVED:** 128x128 is the target; 64 px is a degradation floor, not hardware. (The brief's "128x64" was a coordinator error.)
+- **Q2 RESOLVED:** `provider` and `admin` roles only for `local.<user>.*`; revisit if operators ask.
+- **Q6 RESOLVED:** ship the draft constants from §3.2/3.3; tune during the device trial.
+- **Q3/Q4/Q5:** accepted as proposed (out of scope / deferred).
+- **STATUS: SPEC APPROVED, IMPLEMENTATION ON HOLD** by user decision Nov 13 — no code written; the §7 rollout plan stands whenever the go comes.
