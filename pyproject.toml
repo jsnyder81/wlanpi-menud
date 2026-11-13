@@ -24,6 +24,7 @@ test = ["pytest>=8", "pytest-asyncio>=0.24", "respx>=0.21"]
 
 [project.scripts]
 wlanpi-menud = "wlanpi_menud.__main__:main"
+wlanpi-complication = "wlanpi_menud.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["wlanpi_menud*"]

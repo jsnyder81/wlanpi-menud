@@ -21,7 +21,11 @@
     { "$ref": "#/$defs/prompt" },
     { "$ref": "#/$defs/job" },
     { "$ref": "#/$defs/event" },
-    { "$ref": "#/$defs/error" }
+    { "$ref": "#/$defs/error" },
+    { "$ref": "#/$defs/complication_publish" },
+    { "$ref": "#/$defs/complication_remove" },
+    { "$ref": "#/$defs/complications_configure" },
+    { "$ref": "#/$defs/complication_ack" }
   ],
   "x-close-codes": {
     "1000": "Normal close.",
@@ -206,6 +210,14 @@
             },
             "menu_revision": { "type": "integer", "minimum": 0 }
           }
+        },
+        "surface": {
+          "description": "Additive (complications.2). Display profile an independent thin session's home view uses. Omitted: derived from client.name (wlanpi-fpms: panel, wlanpi-menu-tui: tui, wlanpi-webui: webui), else default. The default session always uses panel and panel.strip.",
+          "$ref": "#/$defs/surface_profile"
+        },
+        "ephemeral": {
+          "description": "Additive (complications.2). true: the independent session is dropped at disconnect with no resume grace (one-shot providers and CLIs). Refused BAD_REQUEST (close 4400) with session default.",
+          "type": "boolean"
         }
       }
     },
@@ -402,6 +414,12 @@
             "queue_frames": { "description": "Outbound queue bound for this client.", "type": "integer", "minimum": 1 },
             "max_frame_bytes": { "type": "integer", "minimum": 1024 }
           }
+        },
+        "features": {
+          "description": "Additive. Optional protocol features this server supports. complications.2: the complication.* and complications.configure frames and the complications.live, complications.catalog and complications.config topics. A client uses them only when it sees the name here.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "uniqueItems": true
         }
       }
     },
@@ -617,6 +635,18 @@
         {
           "if": { "properties": { "topic": { "const": "complications" } } },
           "then": { "properties": { "data": { "$ref": "#/$defs/topic_complications" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "complications.live" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_complications_live" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "complications.catalog" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_complications_catalog" } } }
+        },
+        {
+          "if": { "properties": { "topic": { "const": "complications.config" } } },
+          "then": { "properties": { "data": { "$ref": "#/$defs/topic_complications_config" } } }
         }
       ],
       "type": "object",
@@ -704,6 +734,166 @@
           "label": { "type": "string", "maxLength": 8 },
           "value": { "type": "string" },
           "status": { "type": "string" }
+        }
+      }
+    },
+    "complication_id": {
+      "description": "Additive (complications.2). A complication's identity. wlanpi.* is built in and published only by the service; plugin.<name>.* is declared in plugins.d/<name>/complications.json and published by the unix user that declaration names; local.<user>.* is ad hoc and bound to the caller's own unix username (SO_PEERCRED).",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(wlanpi|plugin|local)(\\.[a-z][a-z0-9_]*){1,3}$"
+    },
+    "complication_pattern": {
+      "description": "Additive (complications.2). A family of complication ids, ending in .*: wlanpi.*, plugin.*, plugin.acme.*, local.*. The same wildcard rule as topic subscriptions.",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(wlanpi|plugin|local)(\\.[a-z][a-z0-9_]*){0,2}\\.\\*$"
+    },
+    "complication_status": {
+      "description": "Additive (complications.2). Closed status vocabulary. ok: working as intended. info: a neutral fact. warn: degraded. error: broken. off: deliberately disabled or idle. unknown: no reading yet. A surface draws an unrecognized status as unknown.",
+      "enum": ["ok", "info", "warn", "error", "off", "unknown"]
+    },
+    "complication_icon": {
+      "description": "Additive (complications.2). A named glyph each surface maps to its own; a surface without that glyph draws none. Adding a name is additive.",
+      "enum": ["battery", "bolt", "bluetooth", "globe", "wifi", "ethernet", "thermometer", "cpu", "users", "radio", "shield", "dot"]
+    },
+    "surface_profile": {
+      "description": "Additive (complications.2). A display profile name: panel, panel.strip, tui, webui, default, or a new surface's own name.",
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)?$"
+    },
+    "complication_publish": {
+      "description": "C to S, additive (complications.2). Create or replace the live record for app_id. Only on local.sock, only for principals with role provider or admin, only inside the caller's namespace (see complication_id). A publish replaces the whole record: omitted optional fields return to their defaults. Every publish restarts the TTL. Replied to with complication.ack (state live) or error: FORBIDDEN (wrong socket, role, namespace, wlanpi.*, quota), BAD_REQUEST (schema, undeclared plugin id, label missing on a local.* id). Never publish secrets: every subscriber, viewers included, sees complications.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "app_id", "value"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "complication.publish" },
+        "app_id": { "$ref": "#/$defs/complication_id" },
+        "value": { "description": "The reading.", "type": "string", "minLength": 1, "maxLength": 20 },
+        "label": { "description": "Short name. Required for local.* ids; a declared id defaults to its declared label.", "type": "string", "minLength": 1, "maxLength": 8 },
+        "short": { "description": "Compact form for strips (85%, -52, ON). Without it a strip shows the first 4 characters of value.", "type": "string", "minLength": 1, "maxLength": 4 },
+        "status": { "description": "Default unknown. warning is a deprecated alias stored as warn.", "anyOf": [{ "$ref": "#/$defs/complication_status" }, { "const": "warning" }] },
+        "detail": { "description": "Longer text for surfaces with room.", "type": "string", "maxLength": 64 },
+        "icon": { "$ref": "#/$defs/complication_icon" },
+        "ttl_sec": { "description": "Lifetime from this publish. Default 30. Not clamped: out of range fails the schema.", "type": "integer", "minimum": 5, "maximum": 3600 },
+        "hold": { "description": "ttl (default): the record lives until its TTL. connection: it is also removed when this connection closes.", "enum": ["ttl", "connection"] }
+      }
+    },
+    "complication_remove": {
+      "description": "C to S, additive (complications.2). Remove a live record. Same socket, role and namespace rules as complication.publish. Replied to with complication.ack (state removed), or error NOT_FOUND when the id is not live.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "app_id"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "complication.remove" },
+        "app_id": { "$ref": "#/$defs/complication_id" }
+      }
+    },
+    "complications_configure": {
+      "description": "C to S, additive (complications.2). Set (show) or reset a surface profile's ordered list of complication ids and families. Role operator or admin, on either socket. Ids not in the catalog are accepted. The reply is an event on complications.config carrying the request id and snapshot=true, sent whether or not the caller is subscribed.",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "surface"],
+      "oneOf": [
+        { "required": ["show"], "not": { "required": ["reset"] } },
+        { "required": ["reset"], "not": { "required": ["show"] } }
+      ],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "complications.configure" },
+        "surface": { "$ref": "#/$defs/surface_profile" },
+        "show": {
+          "type": "array",
+          "maxItems": 24,
+          "items": { "anyOf": [{ "$ref": "#/$defs/complication_id" }, { "$ref": "#/$defs/complication_pattern" }] }
+        },
+        "reset": { "const": true }
+      }
+    },
+    "complication_ack": {
+      "description": "S to C, additive (complications.2). Reply to complication.publish (state live, with the TTL now running) or complication.remove (state removed).",
+      "allOf": [{ "$ref": "#/$defs/envelope" }],
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["v", "type", "id", "app_id", "state"],
+      "properties": {
+        "v": true,
+        "id": true,
+        "type": { "const": "complication.ack" },
+        "app_id": { "$ref": "#/$defs/complication_id" },
+        "state": { "enum": ["live", "removed"] },
+        "ttl_sec": { "type": "integer", "minimum": 1, "maximum": 3600 }
+      }
+    },
+    "topic_complications_live": {
+      "description": "Additive (complications.2). complications.live data: every complication that has a value now, built-in (wlanpi.*) and provider, sorted by app_id. Order is a display concern and comes from complications.config.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["app_id", "label", "value", "status"],
+        "properties": {
+          "app_id": { "$ref": "#/$defs/complication_id" },
+          "label": { "type": "string", "minLength": 1, "maxLength": 8 },
+          "value": { "type": "string", "minLength": 1, "maxLength": 20 },
+          "status": { "$ref": "#/$defs/complication_status" },
+          "short": { "type": "string", "minLength": 1, "maxLength": 4 },
+          "detail": { "type": "string", "maxLength": 64 },
+          "icon": { "$ref": "#/$defs/complication_icon" },
+          "node": { "$ref": "#/$defs/node_id" }
+        }
+      }
+    },
+    "topic_complications_catalog": {
+      "description": "Additive (complications.2). complications.catalog data: what could be shown. Every built-in id this device can produce, every declared plugin id, and every local.* id that is live now, sorted by app_id.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["app_id", "title", "label", "source"],
+        "properties": {
+          "app_id": { "$ref": "#/$defs/complication_id" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 24 },
+          "label": { "type": "string", "minLength": 1, "maxLength": 8 },
+          "source": { "enum": ["builtin", "plugin", "local"] },
+          "icon": { "$ref": "#/$defs/complication_icon" },
+          "description": { "type": "string", "maxLength": 120 },
+          "node": { "$ref": "#/$defs/node_id" }
+        }
+      }
+    },
+    "topic_complications_config": {
+      "description": "Additive (complications.2). complications.config data: each surface profile's ordered show list and which layer it came from (user: complications.configure, site: /etc/wlanpi-menud/complications.json, default: shipped).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surfaces"],
+      "properties": {
+        "surfaces": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/surface_profile" },
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["show", "source"],
+            "properties": {
+              "show": {
+                "type": "array",
+                "maxItems": 24,
+                "items": { "anyOf": [{ "$ref": "#/$defs/complication_id" }, { "$ref": "#/$defs/complication_pattern" }] }
+              },
+              "source": { "enum": ["user", "site", "default"] }
+            }
+          }
         }
       }
     },
@@ -804,7 +994,8 @@
             "properties": {
               "key": { "type": "string", "maxLength": 64 },
               "value": { "type": ["string", "number", "boolean", "null"] },
-              "secret": { "description": "Surfaces may mask until revealed.", "type": "boolean" }
+              "secret": { "description": "Surfaces may mask until revealed.", "type": "boolean" },
+              "level": { "description": "Additive (complications.2). Status of the row; a renderer that ignores it shows the row uncoloured.", "enum": ["ok", "info", "warn", "error"] }
             }
           }
         }

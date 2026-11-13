@@ -26,6 +26,12 @@
 # core_cert = "/etc/nginx/ssl/self-signed-wlanpi.cert"
 # token_command = ["sudo", "-n", "/usr/libexec/wlanpi-menud/get-core-token"]
 
+# Complications (small home-screen status tiles). Site layouts per surface
+# profile go in /etc/wlanpi-menud/complications.json.
+# complication_quota_per_uid = 8
+# complication_quota_total = 32
+# complications_fanout_sec = 0.5
+
 # poll_interval_sec = 5.0
 # queue_frames = 64
 # page_size = 20

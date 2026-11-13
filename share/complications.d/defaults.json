@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "surfaces": {
+    "panel.strip": {
+      "show": [
+        "wlanpi.battery",
+        "wlanpi.bluetooth",
+        "wlanpi.internet"
+      ]
+    },
+    "panel": {
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "wlanpi.wifi",
+        "wlanpi.cpu_temp",
+        "wlanpi.hotspot_clients",
+        "plugin.*",
+        "local.*"
+      ]
+    },
+    "tui": {
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.eth0",
+        "wlanpi.ip",
+        "wlanpi.cpu_temp",
+        "plugin.*",
+        "local.*"
+      ]
+    },
+    "webui": {
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "wlanpi.internet",
+        "wlanpi.wifi",
+        "wlanpi.battery",
+        "wlanpi.cpu_temp",
+        "wlanpi.profiler",
+        "plugin.*",
+        "local.*"
+      ]
+    },
+    "default": {
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "plugin.*",
+        "local.*"
+      ]
+    }
+  }
+}

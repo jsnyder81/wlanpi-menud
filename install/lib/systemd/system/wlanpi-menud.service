@@ -14,6 +14,10 @@ Group=wlanpi-menud
 # removes the top directory; 0750 so only wlanpi-menud members can list it.
 RuntimeDirectory=wlanpi-menud
 RuntimeDirectoryMode=0750
+# Complication display layouts saved with complications.configure
+# (/var/lib/wlanpi-menud/complications.json). The only writable state.
+StateDirectory=wlanpi-menud
+StateDirectoryMode=0750
 UMask=0007
 # Root, unsandboxed ("+"): add nginx's traverse-only ACL to the directory and
 # create the setgid www-data proxy/ directory (see tmpfiles.d/wlanpi-menud.conf).

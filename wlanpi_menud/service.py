@@ -15,6 +15,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+from . import complications as C
 from . import protocol
 from .auth import Introspector, LocalPolicy, Principal
 from .config import Config
@@ -23,7 +24,7 @@ from .core.generated import ROUTES
 from .handlers import handler_exists
 from .jobs import InvokeRefused, Job, JobManager, Prompt
 from .loader import LoadResult, load_menu
-from .menu import DeviceContext, Menu, Node, RouteTable
+from .menu import DeviceContext, Menu, Node, RouteTable, role_rank
 from .nav import NavContext, PromptState, handle_input, normalize, path_to
 from .outqueue import OutQueue
 from .session import DEFAULT, NEW, Attachment, Session
@@ -32,7 +33,7 @@ from .views import render_view
 
 log = logging.getLogger(__name__)
 
-HOME_TOPICS = ("device.summary", "alerts", "complications")
+HOME_TOPICS = ("device.summary", "alerts", "complications.live", "complications.config")
 
 
 class ProtocolViolation(Exception):
@@ -65,8 +66,30 @@ class Service:
         self.ctx = DeviceContext(None, frozenset(), self.routes)
         self.menu_revision = 0
         self.load: LoadResult = self._load_menu()
-        self.complications: dict[str, dict[str, Any]] = {}
         self.poller: Any = None  # the Poller sets itself here
+        self._reply_skip: Attachment | None = None
+        # Complications: provider and built-in records, and display config per surface profile.
+        self.complication_store = C.ComplicationStore(
+            self.hub.publish, fanout_sec=config.complications_fanout_sec,
+            quota_per_uid=config.complication_quota_per_uid, quota_total=config.complication_quota_total)
+        self.display = C.DisplayConfig(config.complications_defaults_file, config.complications_site_file,
+                                       config.complications_user_file)
+        self.hub.publish("complications.config", self.display.data())
+        self.declaration_errors: list[Any] = []
+        self._load_declarations()
+
+    @property
+    def complications(self) -> dict[str, dict[str, Any]]:
+        """Provider records by app_id (the in-process view of the store)."""
+        return self.complication_store.providers
+
+    def _load_declarations(self) -> None:
+        decls, errors = C.load_declarations(self.config.plugins_dir)
+        self.declaration_errors = errors
+        self.local_policy.set_declared_providers({d.user for d in decls.values()})
+        self.complication_store.set_declarations(decls)
+        if decls or errors:
+            log.info("complications: %d declarations loaded, %d errors", len(decls), len(errors))
 
     # ------------------------------------------------------------------ menu
 
@@ -89,6 +112,7 @@ class Service:
         return self.load.menu
 
     def reload_menu(self) -> LoadResult:
+        self._load_declarations()
         self.load = self._load_menu()
         self.menu_revision += 1
         self.refresh_menus(force=True)
@@ -156,12 +180,15 @@ class Service:
             reply = msg_id is not None and (reply_to is None or a is reply_to)
             if not session.thin and not reply and not (session.cursor.job_id and session.cursor.screen in ("result", "busy")):
                 continue
-            frame = render_view(session, a, msg_id if reply else a.next_id(), self.jobs, self.hub.data)
+            frame = render_view(session, a, msg_id if reply else a.next_id(), self.jobs, self.hub.data,
+                                self.home_tiles)
             a.send(frame, coalesce=None if reply else "view")
 
     def _on_publish(self, topic: str, seq: int, data: Any) -> None:
         for s in list(self.sessions.values()):
             for a in list(s.attachments):
+                if a is self._reply_skip:
+                    continue  # it gets this change as the reply to its own request
                 if any(topic_matches(sub, topic) for sub in a.subscriptions):
                     a.send_event(self.hub.event(a.next_id(), topic, snapshot=False), topic)
             if s.thin and s.connected and s.cursor.screen == "home" and topic in HOME_TOPICS:
@@ -221,6 +248,9 @@ class Service:
             raise ProtocolViolation(protocol.error(
                 frame["id"], "BAD_REQUEST", "the default session is thin: rich clients navigate locally "
                 "(send session: new, or mode: thin to mirror the default screen)", close_code=4400))
+        if frame.get("ephemeral") and kind == DEFAULT:
+            raise ProtocolViolation(protocol.error(
+                frame["id"], "BAD_REQUEST", "ephemeral is for independent sessions (session: new)", close_code=4400))
         resume = frame.get("resume") or {}
         same_epoch = resume.get("epoch") == self.epoch
         prior = self.sessions.get(resume.get("session_id", "")) if same_epoch else None
@@ -247,6 +277,8 @@ class Service:
             if session is None:
                 session = Session(NEW, mode, validate=self.validator(), owner_key=principal.key,
                                   socket_kind=socket_kind)
+                session.ephemeral = bool(frame.get("ephemeral"))
+                session.profile = C.profile_for(frame.get("surface"), (frame.get("client") or {}).get("name"))
                 self.sessions[session.id] = session
         a = Attachment(session, principal, socket_kind, client=frame.get("client"),
                        capabilities=frame.get("capabilities"), validate=self.validator())
@@ -261,7 +293,8 @@ class Service:
         welcome = {"v": 1, "type": "welcome", "id": frame["id"], "session_id": session.id, "session": session.kind,
                    "epoch": self.epoch, "principal": principal.frame(), "roles": list(principal.roles),
                    "version": version, "mode": session.mode, "resumed": resumed,
-                   "limits": {"queue_frames": self.config.queue_frames, "max_frame_bytes": self.config.max_frame_bytes}}
+                   "limits": {"queue_frames": self.config.queue_frames, "max_frame_bytes": self.config.max_frame_bytes},
+                   "features": list(protocol.FEATURES)}
         out = [welcome]
         if not resumed or resume.get("menu_revision") != self.menu_revision:
             out.append(self.menu_frame(a, a.next_id()))
@@ -276,7 +309,7 @@ class Service:
                 if p.session_id == session.id:
                     out.append(dict(p.frame, id=a.next_id()))
         if session.thin:
-            out.append(render_view(session, a, a.next_id(), self.jobs, self.hub.data))
+            out.append(render_view(session, a, a.next_id(), self.jobs, self.hub.data, self.home_tiles))
         log.info("%s %s session %s (%s %s, %s) on %s; %d attached", "resumed" if resumed else "attached",
                  session.kind, session.id, principal.kind, principal.name, session.mode, socket_kind,
                  len(session.attachments))
@@ -289,6 +322,10 @@ class Service:
     def _detach(self, a: Attachment) -> None:
         session = a.session
         session.detach(a)
+        self.complication_store.drop_connection(a.id)  # hold: connection
+        if session.ephemeral and not session.connected:
+            self.drop_session(session)  # no resume grace
+            return
         if session.default:
             # A confirmation only its invoker can answer must not strand the
             # shared screen once no connection of that principal is left.
@@ -411,6 +448,12 @@ class Service:
                 if not isinstance(target, str) or not target:
                     raise InvokeRefused("BAD_REQUEST", "webui_session is required")
                 self.revoke_webui_session(target)
+            elif t == "complication.publish":
+                self._complication_publish(a, frame)
+            elif t == "complication.remove":
+                self._complication_remove(a, frame)
+            elif t == "complications.configure":
+                self._complications_configure(a, frame)
             elif t in ("hello", "auth"):
                 raise InvokeRefused("BAD_REQUEST", f"{t} is only valid once, at the start")
         except InvokeRefused as exc:
@@ -515,25 +558,122 @@ class Service:
                     session.cursor = replace(session.cursor, screen="menu", job_id=None)
         self.push_view(session, mid, reply_to=a)
 
-    # ------------------------------------------------------------------ complications (provider publish)
+    # ------------------------------------------------------------------ complications
+
+    def _provider_check(self, a: Attachment, app_id: str) -> tuple[C.Declaration, dict[str, Any]] | None:
+        """Socket, role and namespace rules for complication.publish and .remove (spec 2.4).
+        Returns the declaration for a plugin.* id."""
+        if a.socket_kind != "local":
+            raise InvokeRefused("FORBIDDEN", "complications are published on local.sock only")
+        roles = a.principal.roles
+        if "provider" not in roles and "admin" not in roles:
+            raise InvokeRefused("FORBIDDEN", "publishing complications needs role provider or admin")
+        ns, _, rest = app_id.partition(".")
+        root = a.principal.uid == 0
+        if ns == "wlanpi":
+            raise InvokeRefused("FORBIDDEN", "wlanpi.* complications are reserved for the service")
+        if ns == "plugin":
+            plugin = rest.split(".", 1)[0]
+            found = self.complication_store.declared(app_id)
+            if found is None:
+                owner = self.complication_store.plugin_publisher(plugin)
+                if owner is not None and not root and owner != a.principal.name:
+                    raise InvokeRefused("FORBIDDEN", f"plugin.{plugin}.* is published by {owner}")
+                raise InvokeRefused("BAD_REQUEST", f"{app_id} is not declared in plugins.d/{plugin}/complications.json")
+            if not root and found[0].user != a.principal.name:
+                raise InvokeRefused("FORBIDDEN", f"plugin.{plugin}.* is published by {found[0].user}")
+            return found
+        # local.<user>.*
+        user = rest.split(".", 1)[0]
+        if not root and user != C.map_username(a.principal.name):
+            raise InvokeRefused("FORBIDDEN", f"local.{user}.* belongs to another user; "
+                                             f"use local.{C.map_username(a.principal.name)}.*")
+        return None
+
+    def _complication_publish(self, a: Attachment, frame: dict[str, Any]) -> None:
+        app_id = frame["app_id"]
+        found = self._provider_check(a, app_id)
+        decl = found[1] if found else {}
+        label = frame.get("label") or decl.get("label")
+        if not label:
+            raise InvokeRefused("BAD_REQUEST", "label is required for local.* complications")
+        fields: dict[str, Any] = {
+            "label": C.sanitize(label, C.LABEL_MAX) or decl.get("label") or "?",
+            "value": C.sanitize(frame["value"], C.VALUE_MAX) or C.UNKNOWN_VALUE,
+            "status": C.normalize_status(frame.get("status", "unknown")),
+        }
+        for k, limit in (("short", C.SHORT_MAX), ("detail", C.DETAIL_MAX)):
+            if frame.get(k):
+                v = C.sanitize(frame[k], limit)
+                if v:
+                    fields[k] = v
+        icon = frame.get("icon") or decl.get("icon")
+        if icon:
+            fields["icon"] = icon
+        if decl.get("node"):
+            fields["node"] = decl["node"]
+        ttl = frame.get("ttl_sec", C.DEFAULT_TTL)
+        try:
+            self.complication_store.put(app_id, fields, ttl=ttl, uid=a.principal.uid,
+                                        conn=a.id if frame.get("hold") == "connection" else None)
+        except C.Refused as exc:
+            raise InvokeRefused(exc.code, exc.message) from None
+        a.send({"v": 1, "type": "complication.ack", "id": frame["id"], "app_id": app_id, "state": "live",
+                "ttl_sec": ttl})
+
+    def _complication_remove(self, a: Attachment, frame: dict[str, Any]) -> None:
+        app_id = frame["app_id"]
+        self._provider_check(a, app_id)
+        if not self.complication_store.remove(app_id):
+            raise InvokeRefused("NOT_FOUND", f"{app_id} is not live")
+        a.send({"v": 1, "type": "complication.ack", "id": frame["id"], "app_id": app_id, "state": "removed"})
+
+    def _complications_configure(self, a: Attachment, frame: dict[str, Any]) -> None:
+        if role_rank(a.principal.roles) < 1:
+            raise InvokeRefused("FORBIDDEN", "changing complication layouts needs role operator or admin")
+        surface = frame["surface"]
+        try:
+            if frame.get("reset"):
+                self.display.reset(surface)
+            else:
+                self.display.set(surface, frame["show"])
+        except C.ConfigWriteError as exc:
+            raise InvokeRefused("INTERNAL", f"cannot save the layout: {exc}") from None
+        log.info("complications: %s %s profile %s", a.principal.name, "reset" if frame.get("reset") else "set",
+                 surface)
+        self._reply_skip = a
+        try:
+            self.hub.publish("complications.config", self.display.data())
+        finally:
+            self._reply_skip = None
+        a.send(self.hub.event(frame["id"], "complications.config", snapshot=True))
+
+    def home_tiles(self, session: Session, a: Attachment) -> list[dict[str, Any]]:
+        """The live records a thin home view shows: the session's profile, resolved, cut to capacity."""
+        profile = "panel" if session.default else session.profile
+        live = self.complication_store.live()
+        ids = C.resolve(self.display.show_for(profile), live)
+        alerts = self.hub.data.get("alerts") or []
+        cap = C.home_capacity(profile, (a.capabilities or {}).get("screen"), len(alerts))
+        return [live[i] for i in ids[:cap]]
 
     def publish_complication(self, app_id: str, label: str, value: str, status: str = "unknown",
-                             ttl_seconds: int = 30) -> None:
-        self.complications[app_id] = {"app_id": app_id, "label": label[:8], "value": value, "status": status,
-                                      "expires_at": time.time() + ttl_seconds}
-        self.publish_complications()
+                             ttl_seconds: float = 30) -> None:
+        """In-process publish (no namespace checks). An id outside the new
+        namespaces reaches only the legacy ``complications`` topic."""
+        fields = {"label": C.sanitize(label, C.LABEL_MAX), "value": C.sanitize(value, C.VALUE_MAX) or C.UNKNOWN_VALUE,
+                  "status": C.normalize_status(status) if C.ID_RE.match(app_id) else status}
+        self.complication_store.put(app_id, fields, ttl=ttl_seconds)
 
     def publish_complications(self) -> None:
-        now = time.time()
-        for k in [k for k, c in self.complications.items() if c["expires_at"] <= now]:
-            del self.complications[k]
-        self.hub.publish("complications", [
-            {k: v for k, v in c.items() if k != "expires_at"} for _, c in sorted(self.complications.items())
-        ])
+        """Housekeeping: expire records and publish whatever changed."""
+        if self.complication_store.expire():
+            self.complication_store.changed()
 
     # ------------------------------------------------------------------ lifecycle
 
     async def aclose(self) -> None:
+        self.complication_store.close()
         for s in list(self.sessions.values()):
             s.close(1001, "service stopping")
         await self.jobs.shutdown()

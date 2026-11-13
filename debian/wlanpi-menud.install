@@ -6,4 +6,6 @@ install/lib/systemd/system/wlanpi-menud.service usr/lib/systemd/system/
 share/menu.d/*.json usr/share/wlanpi-menud/menu.d/
 protocol/menu.schema.json usr/share/wlanpi-menud/protocol/
 protocol/frames.schema.json usr/share/wlanpi-menud/protocol/
+protocol/complications.schema.json usr/share/wlanpi-menud/protocol/
+share/complications.d/defaults.json usr/share/wlanpi-menud/complications.d/
 protocol/PROTOCOL.md usr/share/wlanpi-menud/protocol/

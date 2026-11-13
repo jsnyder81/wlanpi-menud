@@ -6,7 +6,9 @@ import copy
 from collections.abc import Callable
 from typing import Any
 
-KNOWN_TOPICS = ("device.summary", "complications", "alerts", "jobs")
+KNOWN_TOPICS = ("device.summary", "complications", "alerts", "jobs",
+                "complications.live", "complications.catalog", "complications.config")
+_INITIAL = {"device.summary": {}, "complications.config": {"surfaces": {}}}
 
 
 def topic_matches(subscription: str, topic: str) -> bool:
@@ -24,7 +26,7 @@ class TopicHub:
         # always gets a snapshot, even before the first poll.
         for t in KNOWN_TOPICS:
             self.seq[t] = 1
-            self.data[t] = {} if t == "device.summary" else []
+            self.data[t] = copy.deepcopy(_INITIAL.get(t, []))
 
     def on_publish(self, fn: Callable[[str, int, Any], None]) -> None:
         self._listeners.append(fn)

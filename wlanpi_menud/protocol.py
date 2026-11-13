@@ -12,8 +12,17 @@ from .manifest import load_schema
 
 VERSION = 1
 SUPPORTED = (1,)
-C2S = ("auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel", "revoke", "nav")
-S2C = ("welcome", "menu", "view", "prompt", "job", "event", "error")
+C2S = ("auth", "hello", "subscribe", "unsubscribe", "input", "invoke", "answer", "page", "cancel", "revoke", "nav",
+       "complication.publish", "complication.remove", "complications.configure")
+S2C = ("welcome", "menu", "view", "prompt", "job", "event", "error", "complication.ack")
+
+# Optional features this service announces in welcome.features.
+FEATURES = ("complications.2",)
+
+
+def def_name(type_: str) -> str:
+    """The frames.schema.json $def for a frame type (complication.publish -> complication_publish)."""
+    return type_.replace(".", "_")
 
 FATAL_CLOSE = {"AUTH_FAILED": 4401, "VERSION": 4426}
 
@@ -33,7 +42,7 @@ _any: Draft202012Validator | None = None
 def _validator(type_: str) -> Draft202012Validator:
     if type_ not in _validators:
         schema = copy.deepcopy(load_schema("frames.schema.json"))
-        sub = {"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{type_}"}
+        sub = {"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{def_name(type_)}"}
         _validators[type_] = Draft202012Validator(sub)
     return _validators[type_]
 

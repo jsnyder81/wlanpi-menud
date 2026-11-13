@@ -96,6 +96,18 @@ class LocalPolicy:
                 log.info("local.sock allowlist: no group %s on this system", name)
         for uid in provider_uids:
             self.uids.setdefault(uid, ("provider",))
+        self.declared_uids: dict[int, tuple[str, ...]] = {}
+
+    def set_declared_providers(self, user_names: set[str] | list[str]) -> None:
+        """A complication declaration (plugins.d/<name>/complications.json, root-owned)
+        grants the provider role on local.sock to the unix user it names."""
+        declared: dict[int, tuple[str, ...]] = {}
+        for name in sorted(set(user_names)):
+            try:
+                declared[pwd.getpwnam(name).pw_uid] = ("provider",)
+            except KeyError:
+                log.info("complication declaration: no user %s on this system", name)
+        self.declared_uids = declared
 
     def _groups(self, cred: PeerCred) -> set[int]:
         groups = {cred.gid}
@@ -107,6 +119,7 @@ class LocalPolicy:
 
     def principal(self, cred: PeerCred) -> Principal | None:
         roles: list[str] = list(self.uids.get(cred.uid, ()))
+        roles.extend(self.declared_uids.get(cred.uid, ()))
         for g in sorted(self._groups(cred)):
             roles.extend(self.gids.get(g, ()))
         if not roles:

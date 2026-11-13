@@ -115,6 +115,10 @@ class Harness:
             validate_outbound=True,
             auth_timeout_sec=1.0,
             resume_grace_sec=30,
+            complications_user_file=tmp / "state" / "complications.json",
+            complications_site_file=tmp / "etc-complications.json",
+            complications_defaults_file=ROOT / "share" / "complications.d" / "defaults.json",
+            complications_fanout_sec=0.0,
         )
         defaults.update(overrides)
         self.config = Config(**defaults)

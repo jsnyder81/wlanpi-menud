@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wlanpi.com/schemas/wlanpi-menud/complications.schema.json",
+  "title": "wlanpi-menud complication declaration (plugins.d/<name>/complications.json)",
+  "description": "Declares the complications a plugin package provides: catalog metadata and which unix user may publish them. Values never come from this file; the publisher sends complication.publish frames on local.sock. The file is root-owned and installed by a package; it grants the provider role on local.sock to publisher.user. A file that fails this schema, or names an id or node outside plugin.<directory name>, is rejected as a whole; the plugin's menu manifests still load.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "publisher", "complications"],
+  "properties": {
+    "schema": { "const": 1 },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["user"],
+      "properties": {
+        "user": {
+          "description": "The unix user that publishes these ids (root may too).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32,
+          "pattern": "^[a-z_][a-z0-9_-]*[$]?$"
+        }
+      }
+    },
+    "complications": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "title", "label"],
+        "properties": {
+          "id": {
+            "description": "The app_id. Must be under plugin.<directory name>.",
+            "type": "string",
+            "maxLength": 64,
+            "pattern": "^plugin(\\.[a-z][a-z0-9_]*){2,3}$"
+          },
+          "title": { "description": "Name shown in customize screens.", "type": "string", "minLength": 1, "maxLength": 24 },
+          "label": { "description": "Default label.", "type": "string", "minLength": 1, "maxLength": 8 },
+          "icon": {
+            "enum": ["battery", "bolt", "bluetooth", "globe", "wifi", "ethernet", "thermometer", "cpu", "users", "radio", "shield", "dot"]
+          },
+          "description": { "description": "WebUI customize page.", "type": "string", "maxLength": 120 },
+          "node": {
+            "description": "Menu node a rich surface opens when the tile is activated. Must be under plugin.<directory name>.",
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^plugin(\\.[a-z][a-z0-9_]*)+$"
+          }
+        }
+      }
+    }
+  }
+}

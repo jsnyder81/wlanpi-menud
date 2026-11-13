@@ -23,6 +23,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any
 
+from . import complications as C
 from .core import CoreError
 from .menu import DeviceContext, RouteTable
 
@@ -47,6 +48,10 @@ class Poller:
         self._context_at = 0.0
         self._context: tuple[Any, ...] = (None,) * 5  # info, model, bt, adapters, ifaces
         self._wake = asyncio.Event()
+        # Wi-Fi link (wlanpi.wifi): every second fast tick while connected,
+        # otherwise only on context ticks.
+        self._wifi: dict[str, Any] | None = None
+        self._wifi_ticks = 0
         service.poller = self
 
     def invalidate_context(self) -> None:
@@ -83,7 +88,8 @@ class Poller:
         )
         # A failed stats read also re-reads the context: it tells "core is
         # down" apart from one endpoint failing.
-        if stats is None or now - self._context_at >= svc.config.context_interval_sec:
+        context_tick = stats is None or now - self._context_at >= svc.config.context_interval_sec
+        if context_tick:
             self._context = tuple(await asyncio.gather(
                 self._get("GET", "/system/device/info"),
                 self._get("GET", "/system/device/model"),
@@ -96,6 +102,7 @@ class Poller:
         if info is None and stats is None:
             svc.hub.publish("device.summary", {"core": "unavailable"})
             svc.hub.publish("alerts", [{"level": "error", "message": "wlanpi-core unavailable"}])
+            svc.complication_store.clear_builtins()
             self._housekeeping()
             return
 
@@ -176,6 +183,20 @@ class Poller:
             "hotspot_clients": clients,
         }
         svc.hub.publish("device.summary", summary)
+
+        # Built-in complications: a second view of the same poll, plus the Wi-Fi link.
+        wifi_applies = svc.routes.has(C.WLAN_LINK_ROUTE) and mode != "hotspot" and C.WIFI_IFACE in wlan
+        if not wifi_applies:
+            self._wifi, self._wifi_ticks = None, 0
+        else:
+            self._wifi_ticks += 1
+            connected = isinstance(self._wifi, dict) and bool(self._wifi.get("connected"))
+            if context_tick or self._wifi is None or (connected and self._wifi_ticks >= 2):
+                link = await self._get("GET", f"/network/interfaces/{C.WIFI_IFACE}/wlan-link")
+                self._wifi = link if isinstance(link, dict) else C.WIFI_UNKNOWN
+                self._wifi_ticks = 0
+        svc.complication_store.set_builtins(C.builtin_complications(
+            summary, self._wifi, capabilities=caps, profiler_route=svc.routes.has(C.PROFILER_ROUTE)))
 
         alerts = []
         if adapters is not None and not wlan:

@@ -132,6 +132,8 @@ class Session:
         self.driver: Driver | None = None
         self.detached_at: float | None = None
         self.saved_subscriptions: set[str] = set()  # independent: carried across a resume
+        self.ephemeral = False  # independent: dropped at disconnect, no resume grace
+        self.profile = "panel"  # complication display profile for the home view
         self._sid = 0
         self._validate = validate
 

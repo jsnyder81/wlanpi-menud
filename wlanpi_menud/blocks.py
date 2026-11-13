@@ -45,6 +45,15 @@ def kv(items: list[tuple[str, Any]] | dict[str, Any], secret_keys: set[str] | fr
     return {"type": "kv", "text": _clip("\n".join(lines), MAX_TEXT), "items": out}
 
 
+def kv_levels(rows: list[tuple[str, Any, str | None]]) -> dict[str, Any]:
+    """A ``kv`` block whose rows carry a status ``level`` (ok, info, warn, error)."""
+    b = kv([(k, v) for k, v, _ in rows])
+    for item, (_, _, level) in zip(b["items"], rows):
+        if level:
+            item["level"] = level
+    return b
+
+
 def table(columns: list[tuple[str, str]], rows: list[list[Any]]) -> dict[str, Any]:
     cols = [{"key": k, "label": _clip(label, 32), "priority": i} for i, (k, label) in enumerate(columns)]
     rows = [[_scalar(c) for c in r] for r in rows]

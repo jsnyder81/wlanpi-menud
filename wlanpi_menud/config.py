@@ -77,6 +77,14 @@ class Config:
     context_interval_sec: float = 30.0
     job_retention_sec: float = 600.0
 
+    # Complications (docs/complications-spec.md).
+    complications_fanout_sec: float = 0.5  # complications* topics publish at most once per window
+    complication_quota_per_uid: int = 8
+    complication_quota_total: int = 32
+    complications_user_file: Path | None = Path("/var/lib/wlanpi-menud/complications.json")
+    complications_site_file: Path | None = Path("/etc/wlanpi-menud/complications.json")
+    complications_defaults_file: Path | None = Path("/usr/share/wlanpi-menud/complications.d/defaults.json")
+
     # Static device facts the service cannot learn from core.
     has_display: bool = False
     has_gpio_buttons: bool = False

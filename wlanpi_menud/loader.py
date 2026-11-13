@@ -112,6 +112,8 @@ def load_menu(
             plugin_dirs = []
         for pdir in plugin_dirs:
             for path in _json_files(pdir):
+                if path.name == "complications.json":
+                    continue  # a complication declaration (complications.py), not a menu manifest
                 consider(path, "plugin", pdir.name)
     if override_dir is not None:
         for path in _json_files(override_dir):

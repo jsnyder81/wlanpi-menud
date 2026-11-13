@@ -8,9 +8,11 @@ answer an open prompt (``answerable``).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from . import blocks as B
+from .complications import LEVEL, UNKNOWN_VALUE
 from .nav import normalize, selected_node
 
 if TYPE_CHECKING:
@@ -27,20 +29,19 @@ HINTS = {
 }
 
 
-def home_blocks(summary: dict[str, Any], alerts: list[Any], complications: list[Any]) -> tuple[str, list[dict[str, Any]]]:
+def home_blocks(summary: dict[str, Any], alerts: list[Any], tiles: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+    """The thin home screen: one ``kv`` row per resolved tile (in profile
+    order, already cut to capacity, each with a ``level``), then the alerts."""
     if not summary or summary.get("core") == "unavailable":
         out = [B.status("error", "wlanpi-core unavailable", "Core")]
         if summary.get("ip"):
             out.append(B.kv([("IP", summary["ip"])]))
         return "unavailable", out
-    items = [(k, summary.get(v)) for k, v in (("Host", "hostname"), ("Mode", "mode"), ("IP", "ip"),
-                                               ("Model", "model"), ("Temp", "cpu_temp")) if summary.get(v)]
-    out = [B.kv(items)] if items else []
+    rows = [(t["label"], UNKNOWN_VALUE if t["status"] == "unknown" else t["value"], LEVEL.get(t["status"], "info"))
+            for t in tiles]
+    out = [B.kv_levels(rows)] if rows else []
     for a in alerts:
         out.append(B.status("warn", str(a.get("message", a)) if isinstance(a, dict) else str(a)))
-    for c in complications:
-        level = {"ok": "ok", "warning": "warn", "error": "error"}.get(c.get("status"), "info")
-        out.append(B.status(level, f"{c.get('label')}: {c.get('value')}", c.get("label")))
     return "home", out or [B.text("WLAN Pi")]
 
 
@@ -67,16 +68,21 @@ def prompt_blocks(p: Prompt, session: Session, c: Any = None) -> list[dict[str, 
     return out
 
 
+HomeTiles = Callable[["Session", "Attachment"], list[dict[str, Any]]]
+
+
 def render_view(session: Session, a: Attachment, msg_id: str, jobs: JobManager,
-                hub_data: dict[str, Any]) -> dict[str, Any]:
+                hub_data: dict[str, Any], tiles: HomeTiles | None = None) -> dict[str, Any]:
     menu = a.menu_view
     c = normalize(session.cursor, menu) if menu is not session.menu_view else session.cursor
     answerable = True
     frame: dict[str, Any] = {"v": 1, "type": "view", "id": msg_id}
     if c.screen == "home":
-        screen, blocks = home_blocks(hub_data.get("device.summary") or {}, hub_data.get("alerts") or [],
-                                     hub_data.get("complications") or [])
-        frame.update(screen=screen, node=None, title="WLAN Pi", blocks=blocks)
+        summary = hub_data.get("device.summary") or {}
+        screen, blocks = home_blocks(summary, hub_data.get("alerts") or [],
+                                     tiles(session, a) if tiles is not None else [])
+        title = summary.get("hostname") if screen == "home" else None
+        frame.update(screen=screen, node=None, title=str(title)[:64] if title else "WLAN Pi", blocks=blocks)
     elif c.screen == "menu":
         parent = c.stack[-1] if c.stack else None
         kids = menu.kids(parent)

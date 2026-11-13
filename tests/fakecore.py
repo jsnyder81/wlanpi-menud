@@ -53,6 +53,9 @@ class FakeCore:
         self.timezone = "UTC"
         self.down = False
         self.cpu_temp = "48.0C"
+        self.battery: dict[str, Any] = {"present": False}
+        self.wlan_link: dict[str, Any] | int = {"interface": "wlan0", "namespace": None, "connected": False,
+                                                 "links": []}
         self.router = respx.Router(assert_all_called=False)
         self._routes()
 
@@ -106,7 +109,10 @@ class FakeCore:
         on("GET", "/system/device/stats", lambda r: {
             "ip": "192.0.2.10", "cpu": "3%", "ram": "200/1000MB", "disk": "2/16GB", "cpu_temp": self.cpu_temp,
             "uptime": "1h"})
-        on("GET", "/system/battery", lambda r: {"present": False})
+        on("GET", "/system/battery", lambda r: self.battery)
+        on("GET", "/network/interfaces/wlan0/wlan-link", lambda r: (
+            httpx.Response(self.wlan_link, json={"detail": "error"}) if isinstance(self.wlan_link, int)
+            else self.wlan_link))
         on("GET", "/bluetooth/status", lambda r: {"name": "wlanpi", "alias": "wlanpi", "addr": "00:00:00:00:00:01",
                                                     "power": "On", "paired_devices": []})
         on("GET", "/profiler/status", lambda r: {"running": False})
