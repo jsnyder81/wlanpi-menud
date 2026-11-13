@@ -145,6 +145,9 @@ def body_rows(screen: dict[str, Any] | None) -> int:
 def home_capacity(profile: str, screen: dict[str, Any] | None, alert_rows: int) -> int:
     """Tile rows on a thin home view: body rows, minus the strip row on the
     panel, minus the alert rows shown (at most 2)."""
+    if profile == "panel.strip":
+        cols = (screen or {}).get("cols", 21)
+        return max(0, (cols - 5) // 5)
     strip = 1 if profile == "panel" else 0
     return max(0, min(SHOW_MAX, body_rows(screen) - strip - min(alert_rows, 2)))
 

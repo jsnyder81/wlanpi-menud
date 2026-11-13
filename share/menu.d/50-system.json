@@ -57,6 +57,20 @@
       }
     },
     {
+      "id": "system.home_tiles",
+      "label": "Home tiles",
+      "parent": "system",
+      "order": 45,
+      "visibility": {
+        "min_role": "operator"
+      },
+      "action": {
+        "handler": "system.home_tiles",
+        "view": "status",
+        "mutates": true
+      }
+    },
+    {
       "id": "system.settings",
       "label": "Settings",
       "parent": "system",

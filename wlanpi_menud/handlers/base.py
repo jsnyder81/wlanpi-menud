@@ -42,6 +42,8 @@ class HandlerContext:
     params: dict[str, Any] = field(default_factory=dict)
     prompt: PromptFn | None = None
     progress: ProgressFn | None = None
+    service: Any = None
+    session_id: str | None = None
 
     async def ask(self, kind: str, title: str, **kw: Any) -> Any:
         """Prompt the invoking session mid-job and wait for its answer."""

@@ -468,7 +468,8 @@ cd /path/to/wlanpi-webui && ./scripts/vendor-sync.sh /path/to/wlanpi-menud
   field) without affecting the plugin's menu manifests. A loaded declaration
   grants the `provider` role on `local.sock` to its `publisher.user`
   (`provider_uids` keeps working). SIGHUP reloads declarations with the
-  manifests.
+  manifests (`systemctl reload wlanpi-menud`). Note that no dpkg trigger
+  exists today for `plugins.d/`, so package installs rely on this signal.
 - `handler_action` takes `mutates` (default false), `shareable` and
   `fresh_sec`, with the same rules as core bindings: a mutating handler is
   never shared or cached, and `fresh_sec` needs `shareable`. For core

@@ -305,7 +305,8 @@ class JobManager:
 
     async def prompt(self, job: Job, kind: str, title: str, *, message: str | None = None,
                      options: list[dict[str, Any]] | None = None, fields: list[dict[str, Any]] | None = None,
-                     param: dict[str, Any] | None = None, confirm: dict[str, Any] | None = None) -> Any:
+                     param: dict[str, Any] | None = None, confirm: dict[str, Any] | None = None,
+                     default: Any = None) -> Any:
         owner = self.service.sessions.get(job.owner)
         if owner is None or owner.id not in job.attached:
             raise PromptCancelled("invoking session has left")
@@ -336,12 +337,14 @@ class JobManager:
         if confirm:
             frame["confirm_label"] = confirm.get("confirm_label", "Confirm")[:16]
             frame["cancel_label"] = confirm.get("cancel_label", "Cancel")[:16]
+        if default is not None:
+            frame["default"] = default
+        elif param is not None and "default" in param:
+            frame["default"] = param["default"]
         if param is not None:
             for k in ("minimum", "maximum"):
                 if k in param:
                     frame[k] = param[k]
-            if "default" in param:
-                frame["default"] = param["default"]
         loop = asyncio.get_running_loop()
         fut: asyncio.Future = loop.create_future()
         p = Prompt(pid, owner.id, job.principal_key, job.id, job.node.id, kind, frame, values, fut,
@@ -550,7 +553,7 @@ class JobManager:
                 job.progress = {"pct": pct} | ({"message": message[:128]} if message else {})
                 self._broadcast(job)
 
-            res = await fn(HandlerContext(core, node.id, params, ask, report))
+            res = await fn(HandlerContext(core, node.id, params, ask, report, service=self.service, session_id=job.owner))
             return res.title or node.label, res.blocks
         selections = 0
         while True:

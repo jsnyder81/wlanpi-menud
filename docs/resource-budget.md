@@ -61,24 +61,25 @@ On a 512 MiB board, 112 MiB steady is about 22 % of RAM. Treat it as the hard li
 - **One polling loop** (until core has an event stream), in two tiers so an idle tick stays cheap:
   - *Fast tier, every `poll_interval_sec` (5 s)*: `/system/device/stats`, `/system/battery`, `/profiler/status`, plus `/system/hotspot/clients` in hotspot mode only (core returns 409 otherwise). These are the homepage values that move.
   - *Context tier, every `context_interval_sec` (30 s)*: `/system/device/info`, `/system/device/model`, `/bluetooth/status`, `/network/config/status`, `/network/interfaces`. These give identity, mode, Bluetooth power and adapters, which drive menu visibility. A **mutating job finishing** (mode switch, Bluetooth toggle, and so on) re-reads the context at once and wakes the loop, so menu changes made from the menu show up without the 30 s wait. Changes made outside the menu (a USB adapter plugged in, a mode set over SSH) show up within 30 s. A failed stats read also re-reads the context in the same tick, so "core is down" is still detected within one tick.
+  - *Wi-Fi link cadence (complications)*: `GET /network/interfaces/{iface}/wlan-link` every 10 s (every second fast tick) when connected (`connected: true`), otherwise on the 30 s context tick.
   - Reachability every 60 s, the OpenAPI route table every 10 minutes (retried after 60 s, not every tick, when core's answer is unusable).
-  - That is about 0.8 core calls/s at idle (was 1.3–1.8 with every endpoint on every tick). Topics publish only on change; `device.summary` still changes most ticks, because cpu and temperature move.
+  - That is about 0.87 core calls/s at idle with wlan-link (was 0.78 before complications; 1.3–1.8 before the tiered poll fix). Topics publish only on change; `device.summary` still changes most ticks, because cpu and temperature move.
 - **No per-session timers.** Thin views are re-rendered only on input or when a subscribed value changes.
 - **TLS to core**: one pooled httpx client, keep-alive **55 s** (`core_keepalive_sec`). httpx's default keep-alive expiry is 5 s, the same as the poll interval, so before this fix the pool had dropped every connection by the next tick and *every* core call paid a full TLS handshake. That was the main cause of the 8–12 % spikes per tick seen on the M4+. 55 s stays under nginx's `keepalive_timeout` (65 s on Debian), so the client always closes first and never reuses a socket nginx has just closed.
 - **Logging**: httpx and httpcore log at WARNING unless `--log-level DEBUG`. At INFO they wrote one journal line per core call, about 4,300 lines an hour, and that cost CPU in journald as well as in the service.
 - **TUI**: Textual renders only on change; no polling (surfaces never poll).
 
-### Idle CPU: before and after the poll-loop fix
+### Idle CPU: before and after the poll-loop fix and complications
 
 Method (`tools/idle_bench/bench.py`): `wlanpi-menud` runs as a real process (`python -m wlanpi_menud`, INFO logging) against an **HTTPS** fake core: stdlib `http.server`, HTTP/1.1 keep-alive, a self-signed RSA-2048 cert pinned through `core_cert`, the vendored OpenAPI route table, and M4+-shaped payloads with cpu and temperature changing on every call. Two idle clients stay connected throughout (one thin on the home screen, one rich subscribed to all four topics, as the TUI is). After 12 s of warm-up, service CPU is `utime + stime` from `/proc/<pid>/stat` over a 90 s window. The fake core counts calls and new TLS connections. "Before" is commit 7f34921 run from a git worktree with the same venv. The dev host is aarch64 (12 cores, CPython 3.13.14), so absolute numbers are lower than on a CM4. The ratios and the call and handshake counts carry over.
 
-| 90 s idle window | Before (7f34921) | After |
-| --- | --- | --- |
-| Service CPU, % of one core | 0.71, 0.68, 0.86 (mean 0.75) | 0.21, 0.40, 0.20, 0.39 (mean 0.30) |
-| Core calls per second | 1.34 | 0.78 (3 per 5 s tick + 5 per 30 s + reachability) |
-| New TLS connections | 120 (every call) | 0 |
-| Journal lines (whole run) | 169 | 22 |
-| RSS | 45–47 MiB | 44–45 MiB |
+| 90 s idle window | Before (7f34921) | After poll fix | With complications + wlan-link |
+| --- | --- | --- | --- |
+| Service CPU, % of one core | 0.71, 0.68, 0.86 (mean 0.75) | 0.21, 0.40, 0.20, 0.39 (mean 0.30) | 0.36, 0.49 (mean 0.42) |
+| Core calls per second | 1.34 | 0.78 (3 per 5 s tick + 5 per 30 s + reachability) | 0.87 (adds wlan-link every 10 s) |
+| New TLS connections | 120 (every call) | 0 | 0–1 |
+| Journal lines (whole run) | 169 | 22 | 22 |
+| RSS | 45–47 MiB | 44–45 MiB | 41–45 MiB |
 
 On the M4+ (`wlanpi-9be`, 2026-11-08) the service measured 1.9–2.2 % idle before the fix. Per-call handshakes cost relatively more on a Cortex-A72 than on the dev host, so the drop on the board should be at least as large. **Re-measure on the board** with `pidstat -p $(systemctl show -p MainPID --value wlanpi-menud) 60 1` before closing the Phase 1 CPU line.
 

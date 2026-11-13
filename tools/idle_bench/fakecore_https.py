@@ -42,6 +42,9 @@ def routes(path):
                          "wlanpi0": {"type": "monitor", "addr": "02:00:00:00:00:01", "wiphy": "0"}}}
     if p == "/network/interfaces":
         return IFACES
+    if p.startswith("/network/interfaces/") and p.endswith("/wlan-link"):
+        return {"connected": True, "ssid": "HomeNet", "bssid": "00:11:22:33:44:55",
+                "freq_mhz": 5180, "signal_dbm": -52, "links": []}
     if p == "/utils/reachability":
         return {"ping_google": "OK", "browse_google": "OK", "dns_google": "OK"}
     if p == "/openapi.json":

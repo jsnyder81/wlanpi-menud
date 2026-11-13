@@ -83,6 +83,7 @@ All of these exist on `main`. They come from rebinding PoC stubs and service cal
 | `GET /system/device/model`, `GET /wifi/capabilities` | Capability visibility (`transmit`, `monitor_adapter`) | The model decides the `transmit` capability, matching `TRANSMIT_ALLOWED_MODELS = {M4, M4+, R4, R5, Pro}`. |
 | `GET /system/timezone/list` | Timezone > Manual | Already in core, unused by the PoC. |
 | `GET /wifi/hotspot/stations` | Hotspot home page client list | Replaces the `clients[]` the PoC expected from row 30. |
+| `GET /network/interfaces/{iface}/wlan-link` | Built-in Wi-Fi link complication (`wlanpi.wifi`) | Returns `WlanLink` (`connected`, `ssid`, `bssid`, `freq_mhz`, `signal_dbm`, `links[]`). Polled every 10 s when connected, 30 s otherwise. |
 
 ## Endpoints still missing in core for parity
 

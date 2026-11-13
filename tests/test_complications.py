@@ -834,3 +834,92 @@ async def test_cli_show_set_reset(harness):
 async def test_cli_service_unreachable(tmp_path):
     code = await asyncio.to_thread(cli.run, ["--socket", str(tmp_path / "nope.sock"), "list"])
     assert code == 4
+
+
+# ---------------------------------------------------------------------------- customize node
+
+async def test_customize_node_hide_show_move_reset_and_viewer_hidden(harness):
+    # 1. Viewer cannot see system.home_tiles in menu; operator can
+    ctx = harness.service.ctx
+    viewer_view = harness.service.menu.view(ctx, ("viewer",))
+    operator_view = harness.service.menu.view(ctx, ("operator",))
+    assert not viewer_view.visible("system.home_tiles")
+    assert operator_view.visible("system.home_tiles")
+    assert "system.home_tiles" not in viewer_view.kids("system")
+    assert "system.home_tiles" in operator_view.kids("system")
+
+    # 2. Thin operator session invokes system.home_tiles
+    c, _ = await thin(harness)
+    await c.send("invoke", node="system.home_tiles")
+
+    # Screen 1: Home tiles top-level
+    p1 = await c.expect(type="prompt")
+    assert p1["title"] == "Home tiles"
+    assert any(o["value"] == "profile:panel" for o in p1["options"])
+    assert any(o["value"] == "reset" for o in p1["options"])
+
+    # Pick "Rows" (panel profile)
+    await c.send("answer", prompt_id=p1["prompt_id"], value="profile:panel")
+
+    # Screen 2: Tile picker
+    p2 = await c.expect(type="prompt")
+    assert p2["title"] == "Rows"
+    assert any(o["value"] == "tile:wlanpi.mode" for o in p2["options"])
+
+    # Pick wlanpi.mode
+    await c.send("answer", prompt_id=p2["prompt_id"], value="tile:wlanpi.mode")
+
+    # Screen 3: Action picker (hide, up, down, back)
+    p3 = await c.expect(type="prompt")
+    assert p3["title"] == "Mode"
+    assert [o["value"] for o in p3["options"]] == ["hide", "up", "down", "back"]
+
+    # Action: Hide
+    await c.send("answer", prompt_id=p3["prompt_id"], value="hide")
+
+    # Screen 2 again: cursor defaulted to tile:wlanpi.mode
+    p4 = await c.expect(type="prompt")
+    assert "wlanpi.mode" not in harness.service.display.show_for("panel")
+    assert p4["title"] == "Rows"
+    assert p4.get("default") == "tile:wlanpi.mode"
+    mode_opt = next(o for o in p4["options"] if o["value"] == "tile:wlanpi.mode")
+    assert mode_opt.get("detail") == "hidden"
+
+    # Pick tile:wlanpi.mode again to show it
+    await c.send("answer", prompt_id=p4["prompt_id"], value="tile:wlanpi.mode")
+    p5 = await c.expect(type="prompt")
+    assert [o["value"] for o in p5["options"]] == ["show", "back"]
+    await c.send("answer", prompt_id=p5["prompt_id"], value="show")
+
+    # Screen 2 again: pick tile:wlanpi.mode to move up
+    p6 = await c.expect(type="prompt")
+    assert "wlanpi.mode" in harness.service.display.show_for("panel")
+    assert harness.service.display.show_for("panel")[-1] == "wlanpi.mode"
+    await c.send("answer", prompt_id=p6["prompt_id"], value="tile:wlanpi.mode")
+    p7 = await c.expect(type="prompt")
+    await c.send("answer", prompt_id=p7["prompt_id"], value="up")
+
+    # Screen 2 again: pick tile:wlanpi.mode to move down
+    p8 = await c.expect(type="prompt")
+    assert harness.service.display.show_for("panel")[-2] == "wlanpi.mode"
+    await c.send("answer", prompt_id=p8["prompt_id"], value="tile:wlanpi.mode")
+    p9 = await c.expect(type="prompt")
+    await c.send("answer", prompt_id=p9["prompt_id"], value="down")
+
+    # Cancel Screen 2 to return to Screen 1
+    p10 = await c.expect(type="prompt")
+    assert harness.service.display.show_for("panel")[-1] == "wlanpi.mode"
+    await c.send("answer", prompt_id=p10["prompt_id"], cancel=True)
+
+    # Screen 1: Reset to default
+    p11 = await c.expect(type="prompt")
+    assert p11["title"] == "Home tiles"
+    await c.send("answer", prompt_id=p11["prompt_id"], value="reset")
+
+    # Cancel Screen 1 to finish
+    p12 = await c.expect(type="prompt")
+    assert harness.service.display.entry("panel")[1] == "default"
+    await c.send("answer", prompt_id=p12["prompt_id"], cancel=True)
+    res = await c.expect(lambda f: f.get("state") in ("result", "error"), type="job")
+    assert res["state"] == "result"
+

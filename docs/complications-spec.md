@@ -1,6 +1,6 @@
 # Complications: creation and display integration (spec)
 
-Status: **design, not implemented**. Written 13 Nov 2026 against `wlanpi-menud` branch `phase1/service`, `wlanpi-menu-tui` `main`, `wlanpi-fpms` `phase3/menud-client`, `wlanpi-webui` `redesign/webui-menu-panel`.
+Status: **service half implemented; surfaces pending**. Written 13 Nov 2026 against `wlanpi-menud` branch `phase1/service`, `wlanpi-menu-tui` `main`, `wlanpi-fpms` `phase3/menud-client`, `wlanpi-webui` `redesign/webui-menu-panel`.
 
 A complication is one small status tile: a label, a value and a status, for example `Batt 85%` or `Uplink OK`. This spec defines the two integrations that are missing today:
 
@@ -652,4 +652,4 @@ The legacy `complications` topic is not removed in protocol v1.
 - **Q2 RESOLVED:** `provider` and `admin` roles only for `local.<user>.*`; revisit if operators ask.
 - **Q6 RESOLVED:** ship the draft constants from §3.2/3.3; tune during the device trial.
 - **Q3/Q4/Q5:** accepted as proposed (out of scope / deferred).
-- **STATUS: SPEC APPROVED, IMPLEMENTATION ON HOLD** by user decision Nov 13 — no code written; the §7 rollout plan stands whenever the go comes.
+- **STATUS: service half implemented; surfaces pending** — service core, store, built-ins, profiles, CLI, and thin customize node implemented; surfaces pending.

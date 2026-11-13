@@ -43,7 +43,7 @@ to wlanpi-core. See `FPMS Re-Architecture Plan.md` for the design and
   `did=wlanpi-menud` token from `sudo -n /usr/libexec/wlanpi-menud/get-core-token`,
   held in memory, refreshed before `exp`, re-minted on 401 and
   `AUTH_CLOCK_NOT_SET`.
-- `systemctl reload wlanpi-menud` (SIGHUP) reloads manifests;
+- `systemctl reload wlanpi-menud` (SIGHUP) reloads manifests and complication declarations in `plugins.d/` (no dpkg trigger is configured today);
   `wlanpi-menud --check` validates them and exits.
 
 ## Installation
