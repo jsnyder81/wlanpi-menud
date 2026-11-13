@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "complications": [
+    {
+      "id": "plugin.acme.uplink",
+      "title": "Acme uplink speed",
+      "label": "Uplink",
+      "icon": "globe",
+      "description": "Measured WAN throughput from the Acme agent.",
+      "node": "plugin.acme.status"
+    }
+  ]
+}

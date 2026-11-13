@@ -75,7 +75,7 @@ DEFAULT_SHOW: dict[str, list[str]] = {
 # CSI and OSC escape sequences, then any remaining C0/C1 control or
 # bidirectional formatting character.
 _ANSI = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]?")
-_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f؜‎‏‪-‮⁦-⁩]")
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 
 
 def sanitize(s: str, limit: int | None = None) -> str:
@@ -219,7 +219,7 @@ def channel_of(freq: float | None) -> int | None:
     """802.11 channel from a centre frequency (2.4, 5 and 6 GHz)."""
     if freq is None:
         return None
-    f = int(round(freq))
+    f = round(freq)
     if f == 2484:
         return 14
     if 2412 <= f <= 2472:
@@ -259,9 +259,9 @@ def wifi_record(link: dict[str, Any] | None) -> dict[str, Any]:
     if freq is not None:
         if ch is not None:
             parts.append(f"ch {ch}")
-        parts.append(f"{int(round(freq))} MHz")
+        parts.append(f"{round(freq)} MHz")
     else:
-        freqs = [int(round(f)) for f in (_number(x.get("freq_mhz")) for x in link.get("links") or []
+        freqs = [round(f) for f in (_number(x.get("freq_mhz")) for x in link.get("links") or []
                                           if isinstance(x, dict)) if f is not None]
         if freqs:
             parts.append("links " + "/".join(str(f) for f in freqs) + " MHz")
@@ -271,7 +271,7 @@ def wifi_record(link: dict[str, Any] | None) -> dict[str, Any]:
     if sig is None:
         r = _rec("wlanpi.wifi", ssid[:VALUE_MAX] or UNKNOWN_VALUE, "unknown", detail=detail)
     else:
-        s = str(int(round(sig)))
+        s = str(round(sig))
         room = VALUE_MAX - len(s) - 1
         name = ssid if len(ssid) <= room else clip(ssid, room)
         r = _rec("wlanpi.wifi", f"{name} {s}" if name else s, signal_status(sig), short=s, detail=detail)
@@ -351,7 +351,7 @@ def builtin_complications(summary: dict[str, Any], wifi: dict[str, Any] | None =
         if pct is None:
             put(_rec("wlanpi.battery", UNKNOWN_VALUE, "unknown", icon=icon))
         else:
-            p = int(round(pct))
+            p = round(pct)
             status = "ok" if p > BATTERY_WARN_AT else ("warn" if p > BATTERY_ERROR_AT else "error")
             if charging and status == "error":
                 status = "warn"
@@ -361,7 +361,7 @@ def builtin_complications(summary: dict[str, Any], wifi: dict[str, Any] | None =
     if temp is None:
         put(_rec("wlanpi.cpu_temp", UNKNOWN_VALUE, "unknown"))
     else:
-        t = int(round(temp))
+        t = round(temp)
         status = "ok" if t < TEMP_WARN_AT else ("warn" if t < TEMP_ERROR_AT else "error")
         put(_rec("wlanpi.cpu_temp", f"{t}C", status, short=f"{t}C"))
 
@@ -369,7 +369,7 @@ def builtin_complications(summary: dict[str, Any], wifi: dict[str, Any] | None =
     if cpu is None:
         put(_rec("wlanpi.cpu", UNKNOWN_VALUE, "unknown"))
     else:
-        put(_rec("wlanpi.cpu", f"{int(round(cpu))}%", "info", short=f"{int(round(cpu))}%"))
+        put(_rec("wlanpi.cpu", f"{round(cpu)}%", "info", short=f"{round(cpu)}%"))
 
     if profiler_route:
         running = summary.get("profiler_running")
@@ -410,7 +410,7 @@ def load_declarations(plugins_dir: Path | None) -> tuple[dict[str, Declaration],
         return decls, errors
     try:
         schema = load_schema("complications.schema.json")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - a broken install must still not crash the service
         errors.append(ManifestError("complications.schema.json", "/", str(exc)))
         return decls, errors
     try:
@@ -468,7 +468,7 @@ def _read_layer(path: Path | None, *, user: bool = False) -> dict[str, list[str]
         doc = json.loads(path.read_text())
         surfaces = doc["surfaces"]
         if not isinstance(surfaces, dict):
-            raise ValueError("surfaces is not an object")
+            raise TypeError("surfaces is not an object")
     except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError) as exc:
         log.error("complications config %s unusable (%s); ignoring it", path, exc)
         if user:
@@ -774,10 +774,3 @@ class ComplicationStore:
 def _visible(r: dict[str, Any]) -> dict[str, Any]:
     return {k: r[k] for k in VISIBLE if r.get(k) is not None}
 
-
-__all__ = [
-    "BUILTINS", "CLIENT_PROFILES", "DEFAULT_SHOW", "ComplicationStore", "ConfigWriteError", "Declaration",
-    "DisplayConfig", "ICONS", "ID_RE", "LEVEL", "PATTERN_RE", "PROFILES", "Refused", "STATUSES", "builtin_complications",
-    "channel_of", "home_capacity", "load_declarations", "map_username", "profile_for", "resolve", "sanitize",
-    "wifi_hysteresis", "wifi_record",
-]

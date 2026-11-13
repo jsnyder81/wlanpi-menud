@@ -1,0 +1,15 @@
+{
+  "v": 1,
+  "type": "hello",
+  "id": "c1",
+  "mode": "rich",
+  "session": "new",
+  "ephemeral": true,
+  "protocol": [
+    1
+  ],
+  "client": {
+    "name": "wlanpi-complication",
+    "version": "1"
+  }
+}

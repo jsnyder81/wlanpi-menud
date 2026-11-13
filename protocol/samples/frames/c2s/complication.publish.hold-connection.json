@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "complication.publish",
+  "id": "c4",
+  "app_id": "plugin.acme.agent",
+  "value": "running",
+  "status": "ok",
+  "icon": "shield",
+  "ttl_sec": 120,
+  "hold": "connection"
+}

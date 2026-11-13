@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "complication.publish",
+  "id": "c2",
+  "app_id": "local.wlanpi.vpn",
+  "label": "VPN",
+  "value": "up"
+}

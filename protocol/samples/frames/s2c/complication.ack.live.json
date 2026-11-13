@@ -1,0 +1,8 @@
+{
+  "v": 1,
+  "type": "complication.ack",
+  "id": "c2",
+  "app_id": "plugin.acme.uplink",
+  "state": "live",
+  "ttl_sec": 60
+}

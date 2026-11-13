@@ -1,0 +1,7 @@
+{
+  "v": 1,
+  "type": "complications.configure",
+  "id": "c10",
+  "surface": "panel",
+  "reset": true
+}

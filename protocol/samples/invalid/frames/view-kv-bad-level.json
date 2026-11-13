@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "type": "view",
+  "id": "s:2",
+  "screen": "home",
+  "node": null,
+  "title": "x",
+  "blocks": [
+    {
+      "type": "kv",
+      "text": "Mode: Classic",
+      "items": [
+        {
+          "key": "Mode",
+          "value": "Classic",
+          "level": "off"
+        }
+      ]
+    }
+  ]
+}

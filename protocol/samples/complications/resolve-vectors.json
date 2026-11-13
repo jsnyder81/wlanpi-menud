@@ -1,0 +1,184 @@
+{
+  "description": "complications resolution (spec 4.3). show + live ids -> expected order before the capacity cut; capacity, when given, is the cut. Every surface tests against this file.",
+  "cases": [
+    {
+      "name": "exact ids in order",
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip"
+      ],
+      "live": [
+        "wlanpi.ip",
+        "wlanpi.mode"
+      ],
+      "expect": [
+        "wlanpi.mode",
+        "wlanpi.ip"
+      ]
+    },
+    {
+      "name": "not live takes no slot",
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.wifi",
+        "wlanpi.ip"
+      ],
+      "live": [
+        "wlanpi.ip",
+        "wlanpi.mode"
+      ],
+      "expect": [
+        "wlanpi.mode",
+        "wlanpi.ip"
+      ]
+    },
+    {
+      "name": "pattern sorted by id",
+      "show": [
+        "plugin.*"
+      ],
+      "live": [
+        "plugin.zed.a",
+        "plugin.acme.b",
+        "plugin.acme.a",
+        "wlanpi.ip"
+      ],
+      "expect": [
+        "plugin.acme.a",
+        "plugin.acme.b",
+        "plugin.zed.a"
+      ]
+    },
+    {
+      "name": "exact entry later in the list wins its slot",
+      "show": [
+        "plugin.*",
+        "plugin.acme.a"
+      ],
+      "live": [
+        "plugin.acme.a",
+        "plugin.acme.b"
+      ],
+      "expect": [
+        "plugin.acme.b",
+        "plugin.acme.a"
+      ]
+    },
+    {
+      "name": "exact entry earlier",
+      "show": [
+        "plugin.acme.b",
+        "plugin.*"
+      ],
+      "live": [
+        "plugin.acme.a",
+        "plugin.acme.b"
+      ],
+      "expect": [
+        "plugin.acme.b",
+        "plugin.acme.a"
+      ]
+    },
+    {
+      "name": "overlapping patterns yield once",
+      "show": [
+        "plugin.acme.*",
+        "plugin.*"
+      ],
+      "live": [
+        "plugin.acme.a",
+        "plugin.b.x"
+      ],
+      "expect": [
+        "plugin.acme.a",
+        "plugin.b.x"
+      ]
+    },
+    {
+      "name": "duplicates keep the first",
+      "show": [
+        "wlanpi.ip",
+        "wlanpi.mode",
+        "wlanpi.ip"
+      ],
+      "live": [
+        "wlanpi.ip",
+        "wlanpi.mode"
+      ],
+      "expect": [
+        "wlanpi.ip",
+        "wlanpi.mode"
+      ]
+    },
+    {
+      "name": "pattern is a segment prefix",
+      "show": [
+        "local.jo.*"
+      ],
+      "live": [
+        "local.jo.a",
+        "local.joe.b"
+      ],
+      "expect": [
+        "local.jo.a"
+      ]
+    },
+    {
+      "name": "empty show",
+      "show": [],
+      "live": [
+        "wlanpi.ip"
+      ],
+      "expect": []
+    },
+    {
+      "name": "default panel profile at 128px",
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "wlanpi.wifi",
+        "wlanpi.cpu_temp",
+        "wlanpi.hotspot_clients",
+        "plugin.*",
+        "local.*"
+      ],
+      "live": [
+        "local.wlanpi.vpn",
+        "plugin.acme.uplink",
+        "wlanpi.cpu",
+        "wlanpi.cpu_temp",
+        "wlanpi.ip",
+        "wlanpi.mode",
+        "wlanpi.wifi"
+      ],
+      "expect": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "wlanpi.wifi",
+        "wlanpi.cpu_temp",
+        "plugin.acme.uplink",
+        "local.wlanpi.vpn"
+      ]
+    },
+    {
+      "name": "capacity cuts the tail, never reorders",
+      "show": [
+        "wlanpi.mode",
+        "wlanpi.ip",
+        "wlanpi.wifi",
+        "wlanpi.cpu_temp"
+      ],
+      "live": [
+        "wlanpi.cpu_temp",
+        "wlanpi.ip",
+        "wlanpi.mode",
+        "wlanpi.wifi"
+      ],
+      "capacity": 2,
+      "expect": [
+        "wlanpi.mode",
+        "wlanpi.ip"
+      ]
+    }
+  ]
+}

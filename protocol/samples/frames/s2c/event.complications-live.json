@@ -1,0 +1,50 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:14",
+  "topic": "complications.live",
+  "seq": 9,
+  "data": [
+    {
+      "app_id": "local.wlanpi.vpn",
+      "label": "VPN",
+      "value": "up",
+      "status": "ok"
+    },
+    {
+      "app_id": "plugin.acme.uplink",
+      "label": "Uplink",
+      "value": "412 Mb/s",
+      "status": "ok",
+      "short": "412",
+      "detail": "WAN2, 14 ms",
+      "icon": "globe",
+      "node": "plugin.acme.status"
+    },
+    {
+      "app_id": "wlanpi.battery",
+      "label": "Batt",
+      "value": "85% charging",
+      "status": "ok",
+      "short": "85%",
+      "icon": "bolt"
+    },
+    {
+      "app_id": "wlanpi.mode",
+      "label": "Mode",
+      "value": "Classic",
+      "status": "info",
+      "short": "CLS",
+      "icon": "dot"
+    },
+    {
+      "app_id": "wlanpi.wifi",
+      "label": "Wi-Fi",
+      "value": "HomeNet -52",
+      "status": "ok",
+      "short": "-52",
+      "detail": "ch 36, 5180 MHz, 02:00:00:00:00:01",
+      "icon": "wifi"
+    }
+  ]
+}

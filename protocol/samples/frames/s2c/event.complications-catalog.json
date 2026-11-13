@@ -1,0 +1,39 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "c5",
+  "topic": "complications.catalog",
+  "seq": 3,
+  "snapshot": true,
+  "data": [
+    {
+      "app_id": "local.wlanpi.vpn",
+      "title": "VPN",
+      "label": "VPN",
+      "source": "local"
+    },
+    {
+      "app_id": "plugin.acme.uplink",
+      "title": "Acme uplink speed",
+      "label": "Uplink",
+      "source": "plugin",
+      "icon": "globe",
+      "description": "Measured WAN throughput from the Acme agent.",
+      "node": "plugin.acme.status"
+    },
+    {
+      "app_id": "wlanpi.mode",
+      "title": "Device mode",
+      "label": "Mode",
+      "source": "builtin",
+      "icon": "dot"
+    },
+    {
+      "app_id": "wlanpi.wifi",
+      "title": "Wi-Fi link",
+      "label": "Wi-Fi",
+      "source": "builtin",
+      "icon": "wifi"
+    }
+  ]
+}

@@ -9,8 +9,8 @@ the gap.
 
 | Socket | Who | Auth |
 | --- | --- | --- |
-| `/run/wlanpi-menud/local.sock` | TUI, panel, local providers, WebUI backend (logout) | Kernel `SO_PEERCRED` uid and gid. No `auth` frame. |
-| `/run/wlanpi-menud/proxy/proxy.sock` (mode 0660, nginx group, in a setgid `www-data` directory) | nginx `/ui/ws`: WebUI browsers, later the mobile app | `X-WebUI-User` and `X-WebUI-Session` from nginx `auth_request`, or a core JWT in the first frame. Peer credentials ignored. `Origin` must match the device host (else close 1008). |
+| `/run/wlanpi-menud/local.sock` | TUI, panel, local providers, WebUI backend (logout). Providers publish complications here, and only here | Kernel `SO_PEERCRED` uid and gid. No `auth` frame. |
+| `/run/wlanpi-menud/proxy/proxy.sock` (mode 0660, nginx group, in a setgid `www-data` directory) | nginx `/ui/ws`: WebUI browsers, later the mobile app. Never publishes complications, whatever the role (it may configure them) | `X-WebUI-User` and `X-WebUI-Session` from nginx `auth_request`, or a core JWT in the first frame. Peer credentials ignored. `Origin` must match the device host (else close 1008). |
 
 The service has no TCP listener. Each WebSocket message is one JSON frame,
 `{"v":1, "type":..., "id":..., ...}`.
@@ -54,6 +54,17 @@ S view        (thin only)        S menu
 5. `welcome` carries `session_id`, the session kind (`session`: `default` or
    `new`), `epoch`, the principal, roles, the negotiated version and whether
    the session `resumed`.
+6. Additive (complications): `hello.surface` names the display profile an
+   independent thin session's home view uses (omitted: derived from
+   `client.name`, see Complication display). `hello.ephemeral: true` drops the
+   independent session at disconnect with no resume grace, so a script that
+   connects every few seconds never accumulates detached sessions; with
+   `session: "default"` it is `BAD_REQUEST` (fatal, close 4400).
+   `welcome.features` lists optional features; wlanpi-menud sends
+   `["complications.2"]`. A client uses the complication frames and topics
+   only when it sees that name: an older service answers a `subscribe` to an
+   unknown topic with a `data: null` snapshot, never an error, so subscribing
+   cannot detect support.
 
 ## Thin and rich mode
 
@@ -154,12 +165,18 @@ allows clients (thin or rich) to move the session cursor directly to a node:
 - The service picks a new random `epoch` each time it starts.
 - `event.seq` starts at 1 per topic per epoch and increments by one for each
   change the service publishes. The service publishes only on change.
-- The four built-in topics have typed `data` in `frames.schema.json`:
+- The seven built-in topics have typed `data` in `frames.schema.json`:
   `device.summary` (`topic_device_summary`), `alerts` (`topic_alerts`), `jobs`
-  (`topic_jobs`) and `complications` (`topic_complications`: `app_id`,
-  `label`, `value`, `status`). Unknown keys fail validation, so a client or a
-  stub that drifts from the service is caught by the schema. Plugin topics
-  carry any JSON.
+  (`topic_jobs`), `complications` (`topic_complications`: `app_id`,
+  `label`, `value`, `status`), and, additive, `complications.live`,
+  `complications.catalog` and `complications.config` (see Complications).
+  Unknown keys fail validation, so a client or a stub that drifts from the
+  service is caught by the schema. Plugin topics carry any JSON.
+- `complications` (legacy) and `device.summary` are **frozen**: their shape
+  and timing do not change. `complications` carries provider records only, in
+  its four-key shape; built-in readings appear only in `complications.live`,
+  so a surface written before it never shows a value twice. A client
+  subscribed to the family `complications.*` receives the new topics too.
 - On reconnect the client sends `hello.resume` with the epoch, its session id
   and the last `seq` it saw per topic.
   - Same epoch and every topic's `seq` equals the server's latest: the session
@@ -180,6 +197,183 @@ allows clients (thin or rich) to move the session cursor directly to a node:
   terminal states are never dropped. A slow client never holds up others.
 - A client that sees a `seq` gap without `snapshot: true` treats that topic as
   stale until the next snapshot.
+
+## Complications
+
+A complication is one small status tile: a label, a value and a status
+(`Batt 85%`, `Uplink OK`). Design: `docs/complications-spec.md`.
+
+### Namespaces and ownership
+
+`app_id` matches `^(wlanpi|plugin|local)(\.[a-z][a-z0-9_]*){1,3}$`, at most
+64 characters.
+
+| Namespace | Who may publish | Ownership |
+| --- | --- | --- |
+| `wlanpi.*` | Only the service (built-ins). Refused for every connection, root included | Reserved in code |
+| `plugin.<name>.*` | The unix user named in that plugin's declaration, and root | `/usr/share/wlanpi-menud/plugins.d/<name>/complications.json`, root-owned, installed by a package; `<name>` is the directory name. The exact id must be declared |
+| `local.<user>.*` | The principal whose unix username is `<user>`; root may publish any `local.*` | `SO_PEERCRED`; no declaration. Usernames are lowercased and other characters become `_` (a leading non-letter gets a `u` prefix) |
+
+Who may publish: a connection on `local.sock` whose principal has role
+`provider` or `admin`. `operator` and `viewer` may not; `proxy.sock` never
+may.
+
+### Publish, replace, remove
+
+```
+C complication.publish {app_id, value, label?, short?, status?, detail?, icon?, ttl_sec?, hold?}
+S complication.ack     {app_id, state: "live", ttl_sec}
+C complication.remove  {app_id}
+S complication.ack     {app_id, state: "removed"}
+```
+
+- **Replace by `app_id`.** A publish replaces the whole record; omitted
+  optional fields return to their defaults (a declared id's `label` and
+  `icon` are its defaults). `label` is required for `local.*` ids.
+- **TTL.** `ttl_sec` is 5 to 3600, default 30; out of range fails the schema
+  (not clamped). Every publish restarts it. There is no "never expires". The
+  service removes a record within 1 s of its deadline (a timer for the nearest
+  deadline, not the poll tick). The catalog entry of a declared id remains.
+- **`hold: "connection"`** also removes the record when the publishing
+  connection closes, so a crashed daemon's tile goes at once.
+- **No-change publish.** A publish whose visible fields equal the live record
+  only restarts the TTL and causes no `event`: the cheap heartbeat.
+- **Fan-out.** The `complications`, `complications.live` and
+  `complications.catalog` topics publish at most once per
+  `complications_fanout_sec` (0.5 s); changes inside the window collapse into
+  one event. Every publish is still acknowledged.
+- **Quotas.** 8 live records per publishing uid, 32 provider records in total
+  (`complication_quota_per_uid`, `complication_quota_total`). A replace is not
+  counted.
+- **Restart.** Records are not persisted. A new `epoch` starts with built-ins
+  only; providers publish again when they reconnect.
+- **Sanitizing.** Control characters, ANSI escapes and bidirectional
+  formatting characters are stripped from every text field. Surfaces still
+  treat tile text as untrusted and escape it.
+- **No secrets.** Every subscriber, `viewer` sessions included, sees
+  complications. Never publish passphrases or keys.
+
+Refusals use `error` with existing codes:
+
+| Case | Code |
+| --- | --- |
+| Sent on `proxy.sock`; role not `provider`/`admin`; `app_id` outside the caller's namespace; `wlanpi.*`; quota reached | `FORBIDDEN` |
+| Fails the schema; `plugin.*` id with no declaration; `label` missing on a `local.*` id | `BAD_REQUEST` |
+| `complication.remove` for an id that is not live | `NOT_FOUND` |
+
+`/usr/bin/wlanpi-complication` wraps these frames for scripts: one
+invocation is one ephemeral connection (`publish`, `remove`, `list`,
+`catalog`, `show <profile> [--set ids | --reset]`). Exit codes: 0 done, 2
+usage, 3 refused (message on stderr), 4 service unreachable.
+
+### Status vocabulary
+
+Closed set: `ok`, `info`, `warn`, `error`, `off`, `unknown`.
+`complication.publish` also accepts `warning`, stored as `warn`. A surface
+draws an unrecognized status as `unknown`. Colour is never the only signal.
+
+| Status | Meaning | Panel | TUI | WebUI | `status`/`kv` level |
+| --- | --- | --- | --- | --- | --- |
+| `ok` | Working as intended | Green square | green | success tag | `ok` |
+| `info` | Neutral fact | Text colour, no marker | default | no tag | `info` |
+| `warn` | Degraded, look soon | Amber square | yellow | warning tag | `warn` |
+| `error` | Broken, act now | Red square | bold red | danger tag | `error` |
+| `off` | Disabled or idle | Dimmed, hollow square | dim | muted tag | `info` |
+| `unknown` | No reading yet | Dimmed, value `--` | dim | muted, value `—` | `info` |
+
+### Text budgets
+
+From the 128 px panel (21 columns): `label` 8, `value` 20 (12 fit beside an
+8-character label), `short` 4, `detail` 64 (never on the panel), catalog
+`title` 24, `description` 120. A surface that runs out of width cuts the
+value with `…`, never the label. `icon` is one of `battery`, `bolt`,
+`bluetooth`, `globe`, `wifi`, `ethernet`, `thermometer`, `cpu`, `users`,
+`radio`, `shield`, `dot`.
+
+### Catalog and live set
+
+| Topic | Answers | Entry |
+| --- | --- | --- |
+| `complications.catalog` | What could be shown: every built-in id this device can produce, every declared plugin id, every `local.*` id live now | `{app_id, title, label, source: builtin\|plugin\|local, icon?, description?, node?}` |
+| `complications.live` | What has a value now: built-ins and providers | `{app_id, label, value, status, short?, detail?, icon?, node?}` |
+
+Both are sorted by `app_id`; order is a display concern. Built-ins
+(`wlanpi.mode`, `.ip`, `.eth0`, `.wlan0`, `.wifi`, `.internet`, `.bluetooth`,
+`.battery`, `.cpu_temp`, `.cpu`, `.profiler`, `.hotspot_clients`) have no TTL,
+are derived from the same poll as `device.summary` (plus
+`GET /network/interfaces/wlan0/wlan-link` for `wlanpi.wifi`), are absent when
+the device cannot produce them and `unknown` when core did not answer. While
+core is unavailable every `wlanpi.*` record leaves the live set.
+
+## Complication display
+
+### Profiles
+
+A profile is a named ordered list (`^[a-z][a-z0-9_]*(\.[a-z0-9_]+)?$`, max
+32): `panel.strip` (front panel status line), `panel` (front panel home rows),
+`tui` (TUI footer), `webui` (status bar, Home card), and `default` for any
+other name until it is configured.
+
+The default session always uses `panel` (and `panel.strip`), whichever
+surface is attached. An independent thin session uses `hello.surface`, else
+`hello.client.name` mapped (`wlanpi-fpms` to `panel`, `wlanpi-menu-tui` to
+`tui`, `wlanpi-webui` to `webui`), else `default`.
+
+### `complications.configure`
+
+```
+C complications.configure {surface, show: [id or family, ... up to 24]}
+C complications.configure {surface, reset: true}
+S event {topic: "complications.config", id: <request id>, snapshot: true, data}
+```
+
+Exactly one of `show` and `reset`. Role `operator` or higher, on either
+socket; `viewer` and `provider` get `FORBIDDEN`. An entry that is neither an
+id nor a family (`plugin.*`, `plugin.acme.*`, `local.*`) is `BAD_REQUEST`;
+an id not in the catalog is accepted, so a layout survives a reinstall. The
+reply is sent whether or not the caller is subscribed; every other
+subscriber gets the change as a normal event. Two saves of one profile: last
+write wins.
+
+`complications.config` data: `{"surfaces": {<profile>: {"show": [...],
+"source": "user"|"site"|"default"}}}`.
+
+### Resolution (normative)
+
+1. Walk `show` in order.
+2. An exact id yields that live record, if it is live.
+3. A family yields every live record it matches that no exact entry anywhere
+   in the list names and that no earlier entry has yielded, sorted by
+   `app_id`.
+4. Drop duplicates, keeping the first.
+5. Cut to the surface's capacity.
+
+A selected tile that is not live takes no slot. Test vectors:
+`samples/complications/resolve-vectors.json`.
+
+### Capacity belongs to the surface
+
+The config decides which tiles and in what order; the surface decides how
+many fit. Overflow is cut from the end, never reordered; alerts take rows
+before tiles. For thin home views the service computes it from
+`hello.capabilities.screen`: body rows are `(height_px - 27) // 12` (or
+`rows - 2`, else 8), minus one strip row on `panel`, minus the alert rows
+shown (at most 2): 7 at 128 px (5 with two alerts), 2 at 64 px. The thin
+home `view` is a `kv` block, one row per tile with `level`, then one
+`status` block per alert; its title is the hostname.
+
+### Storage
+
+| Layer | Path | Written by |
+| --- | --- | --- |
+| User | `/var/lib/wlanpi-menud/complications.json` (`StateDirectory=`) | `complications.configure`, atomically (temp file, rename) |
+| Site | `/etc/wlanpi-menud/complications.json` | An administrator or an image build |
+| Shipped | `/usr/share/wlanpi-menud/complications.d/defaults.json` | The package |
+
+All three are `{"schema": 1, "surfaces": {<profile>: {"show": [...]}}}`.
+Layers apply per profile; `reset` deletes that profile's user layer. A user
+file that fails to parse is logged, renamed aside (`.bad-<time>`) and
+ignored; the service never refuses to start over it.
 
 ## View blocks
 
@@ -235,6 +429,17 @@ failure has a typed code.
     `session: "new"`.
   - Device summary: optional `eth0` and `wlan0` per-interface IP fields
     in `device.summary` payload (additive v1; old clients ignore them).
+  - Complications (`welcome.features: ["complications.2"]`): frames
+    `complication.publish`, `complication.remove`,
+    `complications.configure` and `complication.ack`; topics
+    `complications.live`, `complications.catalog` and
+    `complications.config`; optional `hello.surface`, `hello.ephemeral`,
+    `welcome.features` and `kv` item `level`. `complications` and
+    `device.summary` are unchanged. An old client never sends the new frames
+    or subscribes to the new topics; a new client against an old service sees
+    no `features` entry and stays on `complications` and `device.summary`.
+    The thin home view's rows now come from the `panel` profile (same block
+    types).
 
 ## Contract synchronization (WebUI)
 
@@ -257,6 +462,13 @@ cd /path/to/wlanpi-webui && ./scripts/vendor-sync.sh /path/to/wlanpi-menud
 - Plugins: `plugin` must equal the directory name, every id is under
   `plugin.<name>`, ids colliding with anything registered are refused, and
   `handler` actions are refused (third parties use providers).
+- `plugins.d/<name>/complications.json` is a complication declaration, not a
+  menu manifest: validated by `complications.schema.json`, every `id` and
+  `node` under `plugin.<name>.`, rejected as a whole (errors name the file and
+  field) without affecting the plugin's menu manifests. A loaded declaration
+  grants the `provider` role on `local.sock` to its `publisher.user`
+  (`provider_uids` keeps working). SIGHUP reloads declarations with the
+  manifests.
 - `handler_action` takes `mutates` (default false), `shareable` and
   `fresh_sec`, with the same rules as core bindings: a mutating handler is
   never shared or cached, and `fresh_sec` needs `shareable`. For core
@@ -280,5 +492,4 @@ cd /path/to/wlanpi-webui && ./scripts/vendor-sync.sh /path/to/wlanpi-menud
 
 ## Not yet in the protocol
 
-- Provider registration and `publish` (Phase 6). Complications already
-  have TTL handling in the service (`Service.publish_complication`).
+- Provider menu subtrees and provider `invoke` (Phase 6).

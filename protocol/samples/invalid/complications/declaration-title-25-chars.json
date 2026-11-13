@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "publisher": {
+    "user": "acme"
+  },
+  "complications": [
+    {
+      "id": "plugin.acme.uplink",
+      "title": "xxxxxxxxxxxxxxxxxxxxxxxxx",
+      "label": "Uplink",
+      "icon": "globe",
+      "description": "Measured WAN throughput from the Acme agent.",
+      "node": "plugin.acme.status"
+    }
+  ]
+}

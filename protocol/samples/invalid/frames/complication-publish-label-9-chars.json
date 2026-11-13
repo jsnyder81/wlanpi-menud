@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "type": "complication.publish",
+  "id": "c2",
+  "app_id": "plugin.acme.uplink",
+  "value": "412 Mb/s",
+  "short": "412",
+  "status": "ok",
+  "detail": "WAN2, 14 ms",
+  "ttl_sec": 60,
+  "label": "ninechars"
+}

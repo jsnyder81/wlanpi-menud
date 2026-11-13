@@ -1,0 +1,16 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "s:14",
+  "topic": "complications.live",
+  "seq": 9,
+  "data": [
+    {
+      "app_id": "plugin.acme.uplink",
+      "label": "Uplink",
+      "value": "412 Mb/s",
+      "status": "ok",
+      "expires_at": 1731500000
+    }
+  ]
+}

@@ -12,6 +12,7 @@ stderr), 4 service unreachable.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import sys
@@ -39,7 +40,7 @@ class Session:
     def __init__(self, path: str, timeout: float = TIMEOUT):
         self.timeout = timeout
         try:
-            self.ws = unix_connect(path, uri="ws://localhost/", open_timeout=timeout, close_timeout=1)
+            self.ws = unix_connect(path, uri="ws://localhost/", open_timeout=timeout, close_timeout=1).__enter__()
         except (OSError, InvalidHandshake, InvalidURI, TimeoutError) as exc:
             raise Unreachable(f"cannot connect to {path}: {exc}") from exc
         self._n = 0
@@ -77,10 +78,8 @@ class Session:
         return self.request("subscribe", {"topics": [topic]}, ("event",), topic=topic)["data"]
 
     def close(self) -> None:
-        try:
+        with contextlib.suppress(OSError, ConnectionClosed):
             self.ws.close()
-        except Exception:
-            pass
 
 
 def _parser() -> argparse.ArgumentParser:

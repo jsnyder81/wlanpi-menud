@@ -1,0 +1,49 @@
+{
+  "v": 1,
+  "type": "view",
+  "id": "s:2",
+  "screen": "home",
+  "node": null,
+  "title": "wlanpi-a1b2",
+  "blocks": [
+    {
+      "type": "kv",
+      "text": "Mode: Classic\nIP: 192.0.2.10\nWi-Fi: HomeNet -52\nTemp: 48C\nUplink: 412 Mb/s",
+      "items": [
+        {
+          "key": "Mode",
+          "value": "Classic",
+          "level": "info"
+        },
+        {
+          "key": "IP",
+          "value": "192.0.2.10",
+          "level": "ok"
+        },
+        {
+          "key": "Wi-Fi",
+          "value": "HomeNet -52",
+          "level": "ok"
+        },
+        {
+          "key": "Temp",
+          "value": "48C",
+          "level": "ok"
+        },
+        {
+          "key": "Uplink",
+          "value": "412 Mb/s",
+          "level": "ok"
+        }
+      ]
+    },
+    {
+      "type": "status",
+      "level": "warn",
+      "text": "NO WI-FI ADAPTER"
+    }
+  ],
+  "hints": {
+    "down": "Menu"
+  }
+}

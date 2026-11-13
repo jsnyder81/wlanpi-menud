@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "type": "complications.configure",
+  "id": "c9",
+  "surface": "panel",
+  "show": [
+    "local.wlanpi.t0",
+    "local.wlanpi.t1",
+    "local.wlanpi.t2",
+    "local.wlanpi.t3",
+    "local.wlanpi.t4",
+    "local.wlanpi.t5",
+    "local.wlanpi.t6",
+    "local.wlanpi.t7",
+    "local.wlanpi.t8",
+    "local.wlanpi.t9",
+    "local.wlanpi.t10",
+    "local.wlanpi.t11",
+    "local.wlanpi.t12",
+    "local.wlanpi.t13",
+    "local.wlanpi.t14",
+    "local.wlanpi.t15",
+    "local.wlanpi.t16",
+    "local.wlanpi.t17",
+    "local.wlanpi.t18",
+    "local.wlanpi.t19",
+    "local.wlanpi.t20",
+    "local.wlanpi.t21",
+    "local.wlanpi.t22",
+    "local.wlanpi.t23",
+    "local.wlanpi.t24"
+  ]
+}

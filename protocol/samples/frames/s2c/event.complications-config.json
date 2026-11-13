@@ -1,0 +1,55 @@
+{
+  "v": 1,
+  "type": "event",
+  "id": "c9",
+  "topic": "complications.config",
+  "seq": 4,
+  "snapshot": true,
+  "data": {
+    "surfaces": {
+      "panel.strip": {
+        "show": [
+          "wlanpi.battery",
+          "wlanpi.bluetooth",
+          "wlanpi.internet"
+        ],
+        "source": "default"
+      },
+      "panel": {
+        "show": [
+          "wlanpi.mode",
+          "wlanpi.ip",
+          "wlanpi.wifi",
+          "plugin.acme.uplink",
+          "local.*"
+        ],
+        "source": "user"
+      },
+      "tui": {
+        "show": [
+          "wlanpi.mode",
+          "wlanpi.eth0",
+          "wlanpi.ip",
+          "wlanpi.cpu_temp",
+          "plugin.*",
+          "local.*"
+        ],
+        "source": "default"
+      },
+      "webui": {
+        "show": [
+          "wlanpi.mode",
+          "wlanpi.ip",
+          "wlanpi.internet",
+          "wlanpi.wifi",
+          "wlanpi.battery",
+          "wlanpi.cpu_temp",
+          "wlanpi.profiler",
+          "plugin.*",
+          "local.*"
+        ],
+        "source": "site"
+      }
+    }
+  }
+}

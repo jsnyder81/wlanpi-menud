@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "type": "hello",
+  "id": "c1",
+  "mode": "thin",
+  "session": "new",
+  "surface": "tui",
+  "protocol": [
+    1
+  ],
+  "client": {
+    "name": "wlanpi-menu-tui",
+    "version": "0.2.0"
+  },
+  "capabilities": {
+    "screen": {
+      "cols": 80,
+      "rows": 24
+    },
+    "blocks": [
+      "text",
+      "kv",
+      "status"
+    ]
+  }
+}

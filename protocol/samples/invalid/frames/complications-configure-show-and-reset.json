@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "complications.configure",
+  "id": "c9",
+  "surface": "panel",
+  "show": [
+    "wlanpi.mode"
+  ],
+  "reset": true
+}

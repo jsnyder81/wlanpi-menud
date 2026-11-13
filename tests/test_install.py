@@ -116,3 +116,28 @@ def test_postrm_remove_unlinks_webui_snippet(tmp_path):
     assert "rm -f /etc/wlanpi-webui/nginx/conf.d/wlanpi-menud.conf" in rm_log
     r, grp_log, _ = _run_postrm(tmp_path, "", "")
     assert r.returncode == 0 and grp_log == ""
+
+
+def test_complications_ship_in_the_package():
+    root = INSTALL.parent
+    dest = dict(line.split() for line in (root / "debian/wlanpi-menud.install").read_text().splitlines())
+    assert dest["protocol/complications.schema.json"] == "usr/share/wlanpi-menud/protocol/"
+    assert dest["share/complications.d/defaults.json"] == "usr/share/wlanpi-menud/complications.d/"
+    links = (root / "debian/wlanpi-menud.links").read_text().splitlines()
+    assert "opt/wlanpi-menud/bin/wlanpi-complication usr/bin/wlanpi-complication" in links
+    assert 'wlanpi-complication = "wlanpi_menud.cli:main"' in (root / "pyproject.toml").read_text()
+    unit = (INSTALL / "lib/systemd/system/wlanpi-menud.service").read_text()
+    assert "StateDirectory=wlanpi-menud" in unit
+    c = Config()
+    assert str(c.complications_user_file) == "/var/lib/wlanpi-menud/complications.json"
+    assert str(c.complications_site_file) == "/etc/wlanpi-menud/complications.json"
+    assert str(c.complications_defaults_file) == "/usr/share/wlanpi-menud/complications.d/defaults.json"
+
+
+def test_shipped_defaults_match_the_code():
+    import json
+
+    from wlanpi_menud.complications import DEFAULT_SHOW
+
+    doc = json.loads((INSTALL.parent / "share/complications.d/defaults.json").read_text())
+    assert {k: v["show"] for k, v in doc["surfaces"].items()} == DEFAULT_SHOW
